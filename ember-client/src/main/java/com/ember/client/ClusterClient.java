@@ -1,8 +1,6 @@
 package com.ember.client;
 
-import com.ember.protocol.ClusterMetadataResponse;
-import com.ember.protocol.ErrorCode;
-import com.ember.protocol.ProducerRecord;
+import com.ember.protocol.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -263,6 +261,113 @@ public final class ClusterClient implements Router {
             Thread.currentThread().interrupt();
             throw new IOException("interrupted while backing off", e);
         }
+    }
+
+    // ------------------------------------------------------------------ consumer groups: the coordinator
+
+    /** "host:port" of the broker that coordinates groups (the leader of __groups); null = unknown, ask again. */
+    private String coordinatorAddress;
+
+    private static boolean coordinatorRetriable(ErrorCode code) {
+        return switch (code) {
+            case NOT_COORDINATOR, COORDINATOR_NOT_AVAILABLE, REQUEST_TIMED_OUT, BROKER_OVERLOADED, LEADER_NOT_AVAILABLE -> true;
+            default -> false;                          // UNKNOWN_MEMBER_ID, ILLEGAL_GENERATION, REBALANCE_IN_PROGRESS...: the caller reacts
+        };
+    }
+
+    /** Asks brokers (known ones first, then the bootstrap list) who the coordinator is. Caches the answer. */
+    private void locateCoordinator(String groupId) throws IOException {
+        List<String> candidates = new ArrayList<>();
+        for (String[] b : brokers.values()) candidates.add(b[0] + ":" + b[1]);
+        for (String b : bootstrap) if (!candidates.contains(b)) candidates.add(b);
+        IOException lastIo = null;
+        EmberException lastBroker = null;
+        for (String address : candidates) {
+            try {
+                FindCoordinatorResponse r = connectionTo(address).findCoordinator(groupId);
+                coordinatorAddress = r.host() + ":" + r.port();
+                return;
+            } catch (EmberException e) {
+                lastBroker = e;                          // this broker does not know yet; another may
+            } catch (IOException e) {
+                lastIo = e;
+                dropConnection(address);
+            }
+        }
+        coordinatorAddress = null;
+        if (lastBroker != null) throw lastBroker;
+        throw lastIo != null ? lastIo : new IOException("no broker to ask");
+    }
+
+    private <T> T coordinatorRoute(String groupId, Call<T> call) throws IOException {
+        if (closed) throw new IOException("client is closed");
+        long backoff = config.retryBackoffMs();
+        Exception last = null;
+        for (int attempt = 0; attempt <= config.retries(); attempt++) {
+            if (attempt > 0) {
+                retried.incrementAndGet();
+                pause(backoff);
+                backoff = Math.min(backoff * 2, config.maxRetryBackoffMs());
+            }
+            String address = coordinatorAddress;
+            try {
+                if (address == null) {
+                    locateCoordinator(groupId);
+                    address = coordinatorAddress;
+                }
+                return call.run(connectionTo(address));
+            } catch (EmberException e) {
+                if (!coordinatorRetriable(e.errorCode())) throw e;
+                last = e;
+                if (e.errorCode() == ErrorCode.NOT_COORDINATOR || e.errorCode() == ErrorCode.COORDINATOR_NOT_AVAILABLE) {
+                    coordinatorAddress = null;           // ask FIND_COORDINATOR again after the back-off
+                }
+            } catch (IOException e) {
+                last = e;                                // the coordinator may be dead: find it again
+                if (address != null) dropConnection(address);
+                coordinatorAddress = null;
+            }
+        }
+        if (last instanceof EmberException e) throw e;
+        throw new IOException("coordinator unreachable after " + config.retries() + " retries: " + last, last);
+    }
+
+    public synchronized FindCoordinatorResponse findCoordinator(String groupId) throws IOException {
+        return coordinatorRoute(groupId, c -> c.findCoordinator(groupId));
+    }
+
+    public synchronized JoinGroupResponse joinGroup(String groupId, String memberId, String clientId, int sessionTimeoutMs,
+                                                    List<String> topics) throws IOException {
+        return coordinatorRoute(groupId, c -> c.joinGroup(groupId, memberId, clientId, sessionTimeoutMs, topics));
+    }
+
+    public synchronized void heartbeat(String groupId, String memberId, int generation) throws IOException {
+        coordinatorRoute(groupId, c -> {
+            c.heartbeat(groupId, memberId, generation);
+            return null;
+        });
+    }
+
+    public synchronized void leaveGroup(String groupId, String memberId) throws IOException {
+        coordinatorRoute(groupId, c -> {
+            c.leaveGroup(groupId, memberId);
+            return null;
+        });
+    }
+
+    public synchronized void offsetCommit(String groupId, String memberId, int generation, List<PartitionOffset> offsets) throws IOException {
+        coordinatorRoute(groupId, c -> {
+            c.offsetCommit(groupId, memberId, generation, offsets);
+            return null;
+        });
+    }
+
+    public synchronized List<PartitionOffset> offsetFetch(String groupId, List<PartitionRef> partitions) throws IOException {
+        return coordinatorRoute(groupId, c -> c.offsetFetch(groupId, partitions));
+    }
+
+    public synchronized DescribeGroupResponse describeGroup(String groupId) throws IOException {
+        return coordinatorRoute(groupId, c -> c.describeGroup(groupId));
     }
 
     // ------------------------------------------------------------------ Router

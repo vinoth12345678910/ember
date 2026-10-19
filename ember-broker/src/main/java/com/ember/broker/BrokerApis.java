@@ -2,6 +2,7 @@ package com.ember.broker;
 
 import com.ember.protocol.*;
 import com.ember.replication.Commands;
+import com.ember.replication.GroupCoordinator;
 import com.ember.replication.GroupRuntime;
 import com.ember.replication.MetadataStateMachine;
 import com.ember.storage.Log;
@@ -199,6 +200,62 @@ public class BrokerApis {
             Thread.currentThread().interrupt();
             return Outcome.error(ErrorCode.INTERNAL_ERROR);
         }
+    }
+
+    // ------------------------------------------------------------------ consumer groups
+
+    /** A lone broker wins the election of "__groups" by itself: wait for it (bounded), like produce does. */
+    private void waitForCoordinatorIfAlone() {
+        if (replicas.isSingleBroker()) {
+            long deadline = System.nanoTime() + config.produceTimeoutMs() * 1_000_000L;
+            while (!replicas.groupsGroup().isLeaderReady() && System.nanoTime() < deadline) {
+                java.util.concurrent.locks.LockSupport.parkNanos(1_000_000);
+            }
+        }
+    }
+
+    /** Any broker can answer: it only reads its own view of the "__groups" Raft group. */
+    public Outcome<FindCoordinatorResponse> handleFindCoordinator(FindCoordinatorRequest request) {
+        waitForCoordinatorIfAlone();
+        int leader = replicas.coordinatorId();
+        java.net.InetSocketAddress address = leader < 0 ? null : replicas.addresses().get(leader);
+        if (address == null) {
+            return Outcome.error(ErrorCode.COORDINATOR_NOT_AVAILABLE);
+        }
+        return Outcome.ok(new FindCoordinatorResponse(leader, address.getHostString(), address.getPort()));
+    }
+
+    public Outcome<JoinGroupResponse> handleJoinGroup(JoinGroupRequest r) {
+        waitForCoordinatorIfAlone();
+        GroupCoordinator.JoinResult result = replicas.coordinator().join(r.groupId(), r.memberId(), r.clientId(), r.sessionTimeoutMs(), r.topics());
+        return result.error() == ErrorCode.NONE
+                ? Outcome.ok(new JoinGroupResponse(result.generation(), result.memberId(), result.assignment()))
+                : Outcome.error(result.error());
+    }
+
+    public Outcome<HeartbeatResponse> handleHeartbeat(HeartbeatRequest r) {
+        ErrorCode e = replicas.coordinator().heartbeat(r.groupId(), r.memberId(), r.generation());
+        return e == ErrorCode.NONE ? Outcome.ok(new HeartbeatResponse()) : Outcome.error(e);
+    }
+
+    public Outcome<LeaveGroupResponse> handleLeaveGroup(LeaveGroupRequest r) {
+        ErrorCode e = replicas.coordinator().leave(r.groupId(), r.memberId());
+        return e == ErrorCode.NONE ? Outcome.ok(new LeaveGroupResponse()) : Outcome.error(e);
+    }
+
+    public Outcome<OffsetCommitResponse> handleOffsetCommit(OffsetCommitRequest r) {
+        ErrorCode e = replicas.coordinator().commit(r.groupId(), r.memberId(), r.generation(), r.offsets());
+        return e == ErrorCode.NONE ? Outcome.ok(new OffsetCommitResponse()) : Outcome.error(e);
+    }
+
+    public Outcome<OffsetFetchResponse> handleOffsetFetch(OffsetFetchRequest r) {
+        GroupCoordinator.FetchResult result = replicas.coordinator().fetchOffsets(r.groupId(), r.partitions());
+        return result.error() == ErrorCode.NONE ? Outcome.ok(new OffsetFetchResponse(result.offsets())) : Outcome.error(result.error());
+    }
+
+    public Outcome<DescribeGroupResponse> handleDescribeGroup(DescribeGroupRequest r) {
+        GroupCoordinator.DescribeResult result = replicas.coordinator().describe(r.groupId());
+        return result.error() == ErrorCode.NONE ? Outcome.ok(result.body()) : Outcome.error(result.error());
     }
 
     // ------------------------------------------------------------------ METADATA

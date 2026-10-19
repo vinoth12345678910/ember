@@ -5,7 +5,8 @@ Phase 1 built the storage engine (log segments, index, recovery, retention, fsyn
 Phase 2 added the network layer: a binary wire protocol, a Netty broker, a blocking client and a CLI, with zero-copy fetch.
 Phase 3 added **partitions**: a topic is N independent logs, producers route records by key (murmur2) or round-robin, consumers read any partition, and topics survive restarts with their partition count intact.
 Phase 4 built **Raft consensus in isolation**: a pure, deterministic Raft core (`ember-raft`) and a simulator that attacks it with thousands of failure schedules.
-**Phase 5 (this one)** makes partitions **replicated**: a cluster of 1, 3 or 5 brokers where every partition (and the topic metadata) is its own Raft group. A produce is acknowledged only after a majority has it and the leader has applied it. Leaders can die (`kill -9`) without losing an acknowledged record, and a restarted broker catches up by itself. Design: [`docs/phase5/design.md`](docs/phase5/design.md).
+Phase 5 made partitions **replicated**: a cluster of 1, 3 or 5 brokers where every partition (and the topic metadata) is its own Raft group. A produce is acknowledged only after a majority has it and the leader has applied it. Leaders can die (`kill -9`) without losing an acknowledged record, and a restarted broker catches up by itself. Design: [`docs/phase5/design.md`](docs/phase5/design.md).
+**Phase 6 (this one)** adds **consumer groups**: many consumers read a set of topics as a group. The coordinator (the leader of one more Raft group, `__groups`) divides the partitions among the live members, rebalances when members join, leave or crash, and stores the **committed offsets** in Raft, so a consumer, or a whole broker, can die and the group resumes from the last commit. Delivery is at-least-once. Design: [`docs/phase6/design.md`](docs/phase6/design.md).
 
 ## Modules
 
@@ -13,12 +14,12 @@ Phase 4 built **Raft consensus in isolation**: a pure, deterministic Raft core (
 |--------|-----------|------------|
 | `ember-storage` | `Log`, `Segment`, `LogRecord`, index, retention, flush policy; thread-safe; `openSlice` for zero-copy | nothing |
 | `ember-protocol` | request/response types and codecs (pure `ByteBuffer`), `Partitioner` (murmur2 + round-robin), METADATA v2, RAFT_MESSAGE | storage, raft |
-| `ember-replication` | `FileRaftStorage`, `GroupRuntime` (serial mailbox + timers + propose-and-wait around one `RaftNode`), `PartitionStateMachine` (idempotent apply into the data log), `MetadataStateMachine`, `LocalTransport` | raft, storage, protocol |
+| `ember-replication` | `FileRaftStorage`, `GroupRuntime` (serial mailbox + timers + propose-and-wait around one `RaftNode`), `PartitionStateMachine` (idempotent apply into the data log), `MetadataStateMachine`, `LocalTransport`; Phase 6: `GroupStateMachine` (generations, members, offsets; deterministic), `GroupCoordinator` (leader logic, session expiry), `Assignor` (range) | raft, storage, protocol |
 | `ember-broker` | Netty server, `ReplicaManager` (META group + one Raft group per partition), `PeerNetwork`, `BrokerApis`, `EmberBroker` main | replication, protocol, storage, Netty |
-| `ember-client` | `ClusterClient` (leader routing, controller redirect, retries), `EmberProducer`, `EmberConsumer`, `EmberCli` | protocol |
+| `ember-client` | `ClusterClient` (leader routing, controller redirect, coordinator discovery, retries), `EmberProducer`, `EmberConsumer` (manual), `EmberGroupConsumer` (groups), `EmberCli` | protocol |
 | `ember-raft` | `RaftNode` (leader election + log replication, single-threaded, deterministic), `RaftStorage`, and the simulator `com.ember.raft.sim` (`SimCluster`, invariant checkers, random scenarios, `SimMain`) | nothing (JUnit for tests) |
 
-Docs: [`docs/PROTOCOL.md`](docs/PROTOCOL.md) (byte layouts, hex dump, semantics), `docs/phase2/` (one note per step explaining the *why*), `docs/phase3/` (the same for Phase 3, plus `bench.md`), `docs/phase4/` (Raft: one note per step, `raft-rules-to-code.md`, `simulator.md`, `bug-injection.md`, `phase5-notes.md`), `docs/phase5/` (replication: one note per step and `design.md` with the failure matrix), `docs/ember-part6-notebooklm.md`, `docs/ember-part3-notebooklm.md`, `docs/ember-part4-notebooklm.md`, `docs/ember-part5-notebooklm.md`.
+Docs: [`docs/PROTOCOL.md`](docs/PROTOCOL.md) (byte layouts, hex dump, semantics), `docs/phase2/` (one note per step explaining the *why*), `docs/phase3/` (the same for Phase 3, plus `bench.md`), `docs/phase4/` (Raft: one note per step, `raft-rules-to-code.md`, `simulator.md`, `bug-injection.md`, `phase5-notes.md`), `docs/phase5/` (replication: one note per step and `design.md` with the failure matrix), `docs/phase6/` (consumer groups: one note per step and `design.md`), `docs/ember-part6-notebooklm.md`, `docs/ember-part7-notebooklm.md`, `docs/ember-part3-notebooklm.md`, `docs/ember-part4-notebooklm.md`, `docs/ember-part5-notebooklm.md`.
 
 ## Build
 
@@ -58,6 +59,42 @@ Cluster flags: `--node-id=N --cluster=1@host:port,2@host:port,3@host:port` (same
 Measured on one laptop (Apple M4, 3 broker processes + CLI on the same machine): kill -9 of a partition leader -> first acknowledged produce after **0.82 / 0.84 / 1.65 s** (min / median / max of 5); 4 partitions x 4 producers x 100 B x 50,000 records: 1 broker with Raft 22.8k records/s, 3 brokers fsync ON 10.9k records/s, 3 brokers without Raft fsync 42.1k records/s. Details in `docs/phase5/step9-real-processes.md`.
 
 **Guarantees:** an acknowledged produce is on a majority of Raft logs and never lost or reordered while a majority survives; replicas converge byte for byte. **Not guaranteed:** exactly-once (retries can duplicate), availability without a majority, linearizable reads from a just-deposed leader. No snapshots yet: the Raft log grows and a restart replays it.
+
+## Consumer groups (Phase 6)
+
+```
+scripts/run-cluster.sh 3 19001 ./cluster-data
+CLI="java -jar ember-client/target/ember-client-0.1.0-SNAPSHOT-all.jar --bootstrap=localhost:19001,localhost:19002,localhost:19003"
+$CLI create-topic --topic=orders --partitions=6
+$CLI produce --topic=orders --count=3000 --keys=100 --value=order      # 3,000 keyed records with one producer
+# three consumers in one group (run each in its own terminal, or in the background)
+$CLI consume --group=demo --topic=orders --follow --session-ms=3000 --client-id=c1
+$CLI consume --group=demo --topic=orders --follow --session-ms=3000 --client-id=c2
+$CLI consume --group=demo --topic=orders --follow --session-ms=3000 --client-id=c3
+$CLI group describe --group=demo        # coordinator, generation, members + assignment, per-partition committed / log end / LAG
+$CLI group offsets --group=demo
+kill -9 <pid of one consumer>           # its partitions move to the others after the session timeout
+kill -9 $(cat cluster-data/broker-<coordinator>.pid)   # the coordinator broker: the group carries on
+scripts/demo-groups.sh                  # the whole story with real processes and checks
+scripts/stop-cluster.sh ./cluster-data
+```
+
+```java
+GroupConsumerConfig config = GroupConsumerConfig.of(List.of("localhost:19001"), "demo");
+try (EmberGroupConsumer consumer = new EmberGroupConsumer(config)) {
+    consumer.subscribe("orders");
+    while (running) {
+        for (GroupRecord r : consumer.poll(Duration.ofSeconds(1))) { process(r); }     // process ...
+        consumer.commitSync();                                                           // ... THEN commit (at-least-once)
+    }
+}   // close(): final commit if auto-commit is on, then leaves the group
+```
+
+Broker flags: `--group-min-session-ms` (1000), `--group-max-session-ms` (60000). New API keys 11-17 (FIND_COORDINATOR, JOIN_GROUP, HEARTBEAT, LEAVE_GROUP, OFFSET_COMMIT, OFFSET_FETCH, DESCRIBE_GROUP) and error codes 14-20: see `docs/PROTOCOL.md`.
+
+**Guarantees:** at-least-once; each partition has one owner per generation; an offset commit is accepted only from the current owner in the current generation (a paused "zombie" consumer cannot overwrite its successor's offsets); committed offsets survive the loss of any minority of brokers and a whole-cluster restart. **Not guaranteed:** exactly-once (duplicates after rebalances and crashes, bounded by the commit interval), no automatic rebalance when a topic is created after subscribing, and the `__groups` log is not compacted yet.
+
+Measured on one laptop (Apple M4, 3 broker processes + CLI processes on the same machine; details in `docs/phase6/step9-real-processes.md`): after `kill -9` of a consumer (session timeout 3 s) its partitions were reassigned after a median of 2.6 s; after `kill -9` of the coordinator broker the next commit succeeded after a median of 0.76 s (max 1.57 s); a synchronous OFFSET_COMMIT takes a median of 8.3 ms with Raft fsync on and 0.26 ms without.
 
 ## Raft simulator (Phase 4)
 
@@ -145,6 +182,6 @@ try (EmberConsumer consumer = new EmberConsumer("localhost", 9099)) {
 
 **Ordering:** records are ordered within a partition; records with the same key are ordered (same partition); there is no ordering across partitions.
 
-## Known limitations (through Phase 5)
+## Known limitations (through Phase 6)
 
-The partition count of a topic is fixed at creation and topics cannot be deleted; replication factor = cluster size, with no adding or removing brokers; no Raft snapshots (the Raft log grows, restart replays it); PRODUCE and FETCH name one partition per request; one request in flight per connection; consumer positions live in the client (no groups or committed offsets yet); no TLS/auth (peers are trusted); no compression; no long-poll fetch; at-least-once produce (retries may duplicate); every record is written twice (Raft log + data log). See `docs/phase5/design.md` section 7.
+The partition count of a topic is fixed at creation and topics cannot be deleted; replication factor = cluster size, with no adding or removing brokers; no Raft snapshots (the Raft log grows, restart replays it); PRODUCE and FETCH name one partition per request; one request in flight per connection; consumer groups use eager rebalancing with a range assignor (not sticky), one coordinator for all groups, no offset expiry or group deletion, and the `__groups` log is never compacted; no TLS/auth (peers are trusted); no compression; no long-poll fetch; at-least-once produce (retries may duplicate); every record is written twice (Raft log + data log). See `docs/phase5/design.md` section 7 and `docs/phase6/design.md` section 8.

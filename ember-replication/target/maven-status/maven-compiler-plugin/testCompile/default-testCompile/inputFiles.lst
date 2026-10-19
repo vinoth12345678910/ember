@@ -1,6 +1,10 @@
+/Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/AssignorTest.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/Await.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/CommandsTest.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/FileRaftStorageTest.java
+/Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/GroupCommandsTest.java
+/Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/GroupCoordinatorTest.java
+/Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/GroupStateMachineTest.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/IdempotentApplyTest.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/MetadataStateMachineTest.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/test/java/com/ember/replication/ReplicatedGroupTest.java

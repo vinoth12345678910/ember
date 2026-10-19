@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ember.raft.sim.BugDetectionTest" time="19.511" tests="6" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ember.raft.sim.BugDetectionTest" time="19.407" tests="6" errors="0" skipped="0" failures="0">
   <properties>
     <property name="raft.seeds" value="300"/>
     <property name="java.specification.version" value="21"/>
@@ -13,7 +13,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="IN"/>
     <property name="sun.boot.library.path" value="/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home/lib"/>
-    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/surefire/surefirebooter-20261019171351321_12.jar /Users/vinothanandgani/Dev/ember/ember-raft/target/surefire 2026-10-19T17-13-12_243-jvmRun1 surefire-20261019171351321_10tmp surefire_1-20261019171351321_11tmp"/>
+    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/surefire/surefirebooter-20261019185710473_12.jar /Users/vinothanandgani/Dev/ember/ember-raft/target/surefire 2026-10-19T18-56-31_705-jvmRun1 surefire-20261019185710473_10tmp surefire_1-20261019185710473_11tmp"/>
     <property name="http.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-raft/target/classes:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
@@ -30,7 +30,7 @@
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="apple.awt.application.name" value="ForkedBooter"/>
-    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/surefire/surefirebooter-20261019171351321_12.jar"/>
+    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/surefire/surefirebooter-20261019185710473_12.jar"/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="ftp.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="java.runtime.version" value="21.0.12.1+1-LTS-4"/>
@@ -59,24 +59,24 @@
     <property name="socksNonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="java.class.version" value="65.0"/>
   </properties>
-  <testcase name="commitOldTermByCountingIsCaughtByRandomSeedsOrByTheFigure8Scenario" classname="com.ember.raft.sim.BugDetectionTest" time="3.734">
+  <testcase name="commitOldTermByCountingIsCaughtByRandomSeedsOrByTheFigure8Scenario" classname="com.ember.raft.sim.BugDetectionTest" time="3.712">
     <system-out><![CDATA[BUG COMMIT_OLD_TERM_BY_COUNTING  random seeds: first caught by null after -1 seeds; by kind: {}
 ]]></system-out>
   </testcase>
-  <testcase name="voteWithoutLogCheckIsCaught" classname="com.ember.raft.sim.BugDetectionTest" time="0.913">
+  <testcase name="voteWithoutLogCheckIsCaught" classname="com.ember.raft.sim.BugDetectionTest" time="0.912">
     <system-out><![CDATA[BUG VOTE_WITHOUT_LOG_CHECK       first caught by LeaderCompleteness   at seed 0 (after 1 seeds); violations by kind over 3000 seeds: {LeaderCompleteness=2864, StateMachineSafety=1}; liveness failures: 0
 ]]></system-out>
   </testcase>
-  <testcase name="theCorrectCodeProducesNoViolationsOnTheSameSeeds" classname="com.ember.raft.sim.BugDetectionTest" time="3.731"/>
-  <testcase name="truncatingOnEveryAppendIsCaught" classname="com.ember.raft.sim.BugDetectionTest" time="3.718">
+  <testcase name="theCorrectCodeProducesNoViolationsOnTheSameSeeds" classname="com.ember.raft.sim.BugDetectionTest" time="3.714"/>
+  <testcase name="truncatingOnEveryAppendIsCaught" classname="com.ember.raft.sim.BugDetectionTest" time="3.698">
     <system-out><![CDATA[BUG TRUNCATE_ON_EVERY_APPEND     first caught by CommitIndexBounded   at seed 1 (after 2 seeds); violations by kind over 3000 seeds: {CommitIndexBounded=332, LeaderCompleteness=5}; liveness failures: 1534
 ]]></system-out>
   </testcase>
-  <testcase name="acknowledgingBeforeSyncIsCaught" classname="com.ember.raft.sim.BugDetectionTest" time="3.719">
+  <testcase name="acknowledgingBeforeSyncIsCaught" classname="com.ember.raft.sim.BugDetectionTest" time="3.695">
     <system-out><![CDATA[BUG ACK_BEFORE_SYNC              first caught by ElectionSafety       at seed 66 (after 67 seeds); violations by kind over 3000 seeds: {ElectionSafety=46, LeaderCompleteness=3}; liveness failures: 3
 ]]></system-out>
   </testcase>
-  <testcase name="forgettingTheVoteOnRestartIsCaught" classname="com.ember.raft.sim.BugDetectionTest" time="3.693">
+  <testcase name="forgettingTheVoteOnRestartIsCaught" classname="com.ember.raft.sim.BugDetectionTest" time="3.675">
     <system-out><![CDATA[BUG FORGET_VOTED_FOR_ON_RESTART  first caught by ElectionSafety       at seed 164 (after 165 seeds); violations by kind over 3000 seeds: {ElectionSafety=51}; liveness failures: 0
 ]]></system-out>
   </testcase>

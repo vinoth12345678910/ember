@@ -10,7 +10,7 @@ final class ServerFixture {
     }
 
     static BrokerConfig config(Path dir, String... extra) {
-        String[] flags = new String[extra.length + 12];
+        String[] flags = new String[extra.length + 13];
         flags[0] = "--port=0";
         flags[1] = "--data-dir=" + dir;
         flags[2] = "--segment-bytes=4096";
@@ -24,7 +24,8 @@ final class ServerFixture {
         flags[9] = "--raft-heartbeat-ms=20";
         flags[10] = "--unsafe-no-raft-fsync";
         flags[11] = "--produce-timeout-ms=5000";
-        System.arraycopy(extra, 0, flags, 12, extra.length);
+        flags[12] = "--group-min-session-ms=100";            // Phase 6: tests use short consumer-group sessions
+        System.arraycopy(extra, 0, flags, 13, extra.length);
         return BrokerConfig.parse(flags);
     }
 

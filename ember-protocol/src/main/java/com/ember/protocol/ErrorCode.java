@@ -19,7 +19,21 @@ public enum ErrorCode {
     /** CREATE_TOPIC sent to a broker that is not the leader of the META group. */
     NOT_CONTROLLER(12),
     /** Too many produce requests are waiting for a commit in this partition. */
-    BROKER_OVERLOADED(13);
+    BROKER_OVERLOADED(13),
+    /** This broker is not the coordinator (the leader of the __groups Raft group): FIND_COORDINATOR again and retry. */
+    NOT_COORDINATOR(14),
+    /** The group does not know this member (never joined, expired, or removed): rejoin. */
+    UNKNOWN_MEMBER_ID(15),
+    /** The request carries a generation that is not the group's current one: this member is fenced. */
+    ILLEGAL_GENERATION(16),
+    /** The group changed generation: stop consuming and rejoin to learn the new assignment. */
+    REBALANCE_IN_PROGRESS(17),
+    /** The coordinator is unknown right now (an election is going on): back off and retry. */
+    COORDINATOR_NOT_AVAILABLE(18),
+    /** The session timeout is outside the range the broker allows: a caller bug. */
+    INVALID_SESSION_TIMEOUT(19),
+    /** OFFSET_COMMIT for a partition that is not assigned to this member: a caller bug. */
+    PARTITION_NOT_ASSIGNED(20);
 
     private final short code;
 

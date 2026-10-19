@@ -1,5 +1,7 @@
 com/ember/broker/PartitionTestSupport.class
+com/ember/broker/GroupChaosTest$ProducerLoop.class
 com/ember/broker/ServerFixture.class
+com/ember/broker/GroupMember$Delivery.class
 com/ember/broker/ClusterSmokeTest.class
 com/ember/broker/CliTest.class
 com/ember/broker/MutableClock.class
@@ -8,15 +10,21 @@ com/ember/broker/LeaderStabilityTest.class
 com/ember/broker/ClientIntegrationTest.class
 com/ember/broker/DataDirLockTest.class
 com/ember/broker/HardeningTest.class
+com/ember/broker/GroupCliTest.class
 com/ember/broker/SmokeTest.class
 com/ember/broker/TopicApiOverTheWireTest.class
 com/ember/broker/BrokerApisTest.class
+com/ember/broker/GroupChaosTest.class
 com/ember/broker/Await.class
+com/ember/broker/GroupChaosTest$CommitMonitor.class
+com/ember/broker/GroupScenariosTest.class
 com/ember/broker/BrokerApisPartitionsTest.class
 com/ember/broker/ClusterIntegrationTest.class
+com/ember/broker/GroupMember.class
 com/ember/broker/ClusterChaosTest$ProducerLoop.class
 com/ember/broker/BrokerClusterConfigTest.class
 com/ember/broker/FetchOverTheWireTest.class
+com/ember/broker/EmberGroupConsumerTest.class
 com/ember/broker/CliTest$Result.class
 com/ember/broker/LogManagerTest.class
 com/ember/broker/TestCluster.class
@@ -28,4 +36,5 @@ com/ember/broker/ClusterChaosTest$Ack.class
 com/ember/broker/PeerTrafficIsolationTest.class
 com/ember/broker/ProduceMetadataOverTheWireTest.class
 com/ember/broker/PartitionedBrokerLifecycleTest.class
+com/ember/broker/GroupApisOverTheWireTest.class
 com/ember/broker/PartitionedProducerConsumerTest.class

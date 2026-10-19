@@ -38,6 +38,7 @@ public final class ReplicaManager implements AutoCloseable {
 
     private static final System.Logger LOG = System.getLogger(ReplicaManager.class.getName());
     public static final String META_TOPIC = "__meta";
+    public static final String GROUPS_TOPIC = "__groups";
 
     /** How a group sends a Raft message to a peer broker. Must never block. */
     public interface RaftSender {
@@ -88,12 +89,16 @@ public final class ReplicaManager implements AutoCloseable {
     private final Path dataDir;
     private final Path raftDir;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, r -> daemon(r, "ember-raft-timers"));
+    private final ScheduledExecutorService sessions = Executors.newSingleThreadScheduledExecutor(r -> daemon(r, "ember-group-sessions"));
     private final ExecutorService workers = Executors.newFixedThreadPool(4, r -> daemon(r, "ember-raft-worker"));
     private final ScheduledExecutorService maintenance = Executors.newSingleThreadScheduledExecutor(r -> daemon(r, "ember-maintenance"));
     private final Map<String, TopicState> topics = new ConcurrentHashMap<>();
     private final Map<String, PartitionReplica> byKey = new ConcurrentHashMap<>();
     private final MetadataStateMachine metaStateMachine;
     private final GroupRuntime metaGroup;
+    private final GroupStateMachine groupState = new GroupStateMachine();
+    private final GroupRuntime groupsGroup;
+    private final GroupCoordinator coordinator;
     private volatile boolean closed;
 
     public ReplicaManager(BrokerConfig config, Map<Integer, InetSocketAddress> addresses, RaftSender sender) throws IOException {
@@ -110,6 +115,18 @@ public final class ReplicaManager implements AutoCloseable {
         this.metaStateMachine = new MetadataStateMachine(this::createPartitionGroups, config.maxPartitionsPerTopic());
         this.metaGroup = newGroup(META_TOPIC, 0, metaStateMachine);
         metaGroup.start();
+
+        // consumer groups: ONE more Raft group on every broker; its leader is the coordinator for all groups.
+        // Created empty when its directory does not exist, so Phase 5 data directories open unchanged.
+        this.groupsGroup = newGroup(GROUPS_TOPIC, 0, groupState);
+        this.coordinator = new GroupCoordinator("broker " + selfId, GroupLog.of(groupsGroup), groupState,
+                topic -> {
+                    TopicState t = topics.get(topic);
+                    return t == null ? -1 : t.partitionCount();
+                },
+                GroupRuntime::monotonicMillis, () -> java.util.UUID.randomUUID().toString(),
+                new GroupCoordinator.Config(config.groupMinSessionMs(), config.groupMaxSessionMs(), config.produceTimeoutMs(), 5));
+        groupsGroup.start();
     }
 
     private static Thread daemon(Runnable r, String name) {
@@ -204,6 +221,24 @@ public final class ReplicaManager implements AutoCloseable {
         return metaGroup;
     }
 
+    public GroupRuntime groupsGroup() {
+        return groupsGroup;
+    }
+
+    public GroupCoordinator coordinator() {
+        return coordinator;
+    }
+
+    /** Test hook: the replicated state of all consumer groups on THIS broker (compare snapshots across brokers). */
+    public GroupStateMachine groupState() {
+        return groupState;
+    }
+
+    /** The leader of "__groups" (this broker included) or -1. */
+    public int coordinatorId() {
+        return groupsGroup.isLeader() ? selfId : groupsGroup.leaderId();
+    }
+
     public boolean isController() {
         return metaGroup.isLeader();
     }
@@ -236,6 +271,10 @@ public final class ReplicaManager implements AutoCloseable {
         }
         if (topic.equals(META_TOPIC) && partition == 0) {
             metaGroup.deliver(fromNode, message);
+            return;
+        }
+        if (topic.equals(GROUPS_TOPIC) && partition == 0) {
+            groupsGroup.deliver(fromNode, message);
             return;
         }
         PartitionReplica r = byKey.get(topic + "-" + partition);
@@ -294,6 +333,26 @@ public final class ReplicaManager implements AutoCloseable {
     public void startMaintenance(Clock clock) {
         maintenance.scheduleWithFixedDelay(() -> runMaintenance(clock.millis()),
                 config.maintenanceIntervalMs(), config.maintenanceIntervalMs(), TimeUnit.MILLISECONDS);
+        scheduleSessionExpiry();
+    }
+
+    /** Session expiry runs on its own cadence (a quarter of the shortest session in use), on its own thread. */
+    private void scheduleSessionExpiry() {
+        if (closed) {
+            return;
+        }
+        try {
+            sessions.schedule(() -> {
+                try {
+                    coordinator.expireSessions();
+                } catch (RuntimeException e) {
+                    LOG.log(System.Logger.Level.ERROR, "session expiry failed", e);
+                }
+                scheduleSessionExpiry();
+            }, coordinator.tickIntervalMs(), TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            // shutting down
+        }
     }
 
     // ------------------------------------------------------------------ shutdown
@@ -315,11 +374,13 @@ public final class ReplicaManager implements AutoCloseable {
         }
         closed = true;
         maintenance.shutdownNow();
+        sessions.shutdownNow();
         for (TopicState t : topics.values()) {
             for (PartitionReplica r : t.replicas()) {
                 if (graceful) r.group().close(); else r.group().abort();
             }
         }
+        if (graceful) groupsGroup.close(); else groupsGroup.abort();
         if (graceful) metaGroup.close(); else metaGroup.abort();
         for (TopicState t : topics.values()) {
             for (PartitionReplica r : t.replicas()) {
