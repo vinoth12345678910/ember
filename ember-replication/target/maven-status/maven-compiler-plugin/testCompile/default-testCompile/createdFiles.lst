@@ -1,9 +1,14 @@
-com/ember/replication/Await.class
-com/ember/replication/ReplicationCluster$Replica.class
 com/ember/replication/ReplicatedGroupTest$1.class
 com/ember/replication/ReplicatedGroupTest.class
+com/ember/replication/AssignorTest.class
+com/ember/replication/GroupCoordinatorTest.class
 com/ember/replication/MetadataStateMachineTest.class
+com/ember/replication/GroupStateMachineTest.class
 com/ember/replication/ReplicationCluster.class
 com/ember/replication/FileRaftStorageTest.class
 com/ember/replication/CommandsTest.class
 com/ember/replication/IdempotentApplyTest.class
+com/ember/replication/Await.class
+com/ember/replication/ReplicationCluster$Replica.class
+com/ember/replication/GroupCommandsTest.class
+com/ember/replication/GroupCoordinatorTest$FakeLog.class

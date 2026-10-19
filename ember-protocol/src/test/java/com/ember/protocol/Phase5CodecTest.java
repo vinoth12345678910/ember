@@ -143,7 +143,7 @@ class Phase5CodecTest {
     @Test
     void raftMessageOnlyExistsInVersionZeroAndTheNextApiKeyIsUnknown() {
         assertEquals(ErrorCode.UNSUPPORTED_VERSION, fails(raw(10, 1, b -> { })).errorCode());
-        assertEquals(ErrorCode.UNSUPPORTED_API, fails(raw(11, 0, b -> { })).errorCode());
+        assertEquals(ErrorCode.UNSUPPORTED_API, fails(raw(18, 0, b -> { })).errorCode());   // 11..17 are the Phase 6 group APIs
         assertThrows(ProtocolException.class, () -> ResponseCodec.decode(ApiKey.RAFT_MESSAGE, ByteBuffer.allocate(6)));
     }
 
@@ -160,7 +160,7 @@ class Phase5CodecTest {
             assertEquals(expected[i], d.errorCode());
             assertNull(d.body());
         }
-        assertThrows(ProtocolException.class, () -> ErrorCode.fromCode((short) 14));
+        assertThrows(ProtocolException.class, () -> ErrorCode.fromCode((short) 21));   // 14..20 are the Phase 6 group errors
     }
 
     // ---- METADATA v2

@@ -87,6 +87,37 @@ public class EmberClient implements AutoCloseable {
         return ((CreateTopicResponse) call(new CreateTopicRequest(topic, partitions), (short) 0)).partitionCount();
     }
 
+    // ---- consumer groups (Phase 6): thin wrappers; routing and retries live in ClusterClient
+
+    public synchronized FindCoordinatorResponse findCoordinator(String groupId) throws IOException {
+        return (FindCoordinatorResponse) call(new FindCoordinatorRequest(groupId), (short) 0);
+    }
+
+    public synchronized JoinGroupResponse joinGroup(String groupId, String memberId, String clientId, int sessionTimeoutMs,
+                                                    List<String> topics) throws IOException {
+        return (JoinGroupResponse) call(new JoinGroupRequest(groupId, memberId, clientId, sessionTimeoutMs, topics), (short) 0);
+    }
+
+    public synchronized void heartbeat(String groupId, String memberId, int generation) throws IOException {
+        call(new HeartbeatRequest(groupId, memberId, generation), (short) 0);
+    }
+
+    public synchronized void leaveGroup(String groupId, String memberId) throws IOException {
+        call(new LeaveGroupRequest(groupId, memberId), (short) 0);
+    }
+
+    public synchronized void offsetCommit(String groupId, String memberId, int generation, List<PartitionOffset> offsets) throws IOException {
+        call(new OffsetCommitRequest(groupId, memberId, generation, offsets), (short) 0);
+    }
+
+    public synchronized List<PartitionOffset> offsetFetch(String groupId, List<PartitionRef> partitions) throws IOException {
+        return ((OffsetFetchResponse) call(new OffsetFetchRequest(groupId, partitions), (short) 0)).offsets();
+    }
+
+    public synchronized DescribeGroupResponse describeGroup(String groupId) throws IOException {
+        return (DescribeGroupResponse) call(new DescribeGroupRequest(groupId), (short) 0);
+    }
+
     private Response call(Request request, short apiVersion) throws IOException {
         int correlationId = nextCorrelationId++;
         byte[] bytes;

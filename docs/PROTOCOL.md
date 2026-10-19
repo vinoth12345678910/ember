@@ -180,6 +180,22 @@ In Phase 5 every partition is replicated on every broker, so `replicas` is alway
 
 Same strict rules as every codec: lengths and counts are validated against the bytes actually remaining before anything is allocated; booleans must be 0 or 1; terms and indexes must not be negative; unknown message or entry types and trailing bytes are errors.
 
+## Consumer group APIs (apiKeys 11-17, version 0) - Phase 6
+
+All use the same frame header; the response is `INT32 correlationId | INT16 errorCode | body` and the body is present only when the error code is 0. `STRING` is `INT16 length | UTF-8 bytes`. Group ids, member ids, client ids: non-empty, at most 255 UTF-8 bytes (a member id may be empty ONLY in JOIN_GROUP); topic names follow the normal topic rules. Every list has at most 10,000 elements; counts are validated against the bytes that remain before anything is allocated; trailing bytes are an error (`INVALID_REQUEST`).
+
+| apiKey | Name | Request body | Response body (error 0) |
+|---|---|---|---|
+| 11 | FIND_COORDINATOR | `STRING groupId` | `INT32 nodeId \| STRING host \| INT32 port` (the leader of the `__groups` Raft group) |
+| 12 | JOIN_GROUP | `STRING groupId \| STRING memberId \| STRING clientId \| INT32 sessionTimeoutMs \| INT32 topicCount \| STRING topic x n` | `INT32 generation \| STRING memberId \| INT32 assignedCount \| (STRING topic, INT32 partition) x n` |
+| 13 | HEARTBEAT | `STRING groupId \| STRING memberId \| INT32 generation` | (empty) |
+| 14 | LEAVE_GROUP | `STRING groupId \| STRING memberId` | (empty) |
+| 15 | OFFSET_COMMIT | `STRING groupId \| STRING memberId \| INT32 generation \| INT32 n \| (STRING topic, INT32 partition, INT64 offset) x n` | (empty; the error code covers the whole request: all or nothing) |
+| 16 | OFFSET_FETCH | `STRING groupId \| INT32 n \| (STRING topic, INT32 partition) x n` | `INT32 n \| (STRING topic, INT32 partition, INT64 offset) x n` (offset -1 = none committed) |
+| 17 | DESCRIBE_GROUP | `STRING groupId` | `INT32 generation \| INT8 state (0 unknown group, 1 empty, 2 stable) \| INT32 memberCount \| members \| INT32 offsetCount \| (STRING topic, INT32 partition, INT64 offset) x n`; member = `STRING memberId \| STRING clientId \| INT32 sessionTimeoutMs \| INT32 topicCount \| STRING topic x n \| INT32 assignedCount \| (STRING topic, INT32 partition) x n` |
+
+How a client uses them: FIND_COORDINATOR (any broker answers from its Raft state) -> JOIN_GROUP (empty memberId the first time) -> HEARTBEAT every few seconds (`REBALANCE_IN_PROGRESS` means "rejoin") -> OFFSET_COMMIT with the member id and generation it holds -> LEAVE_GROUP. Retriable after FIND_COORDINATOR and a back-off: 14 and 18 (and the Phase 5 retriable set). 15, 16, 17 are group-state errors the consumer handles by rejoining. 19 and 20 are caller bugs.
+
 ## State machine commands (inside Raft COMMAND entries)
 
 These are not wire messages between clients and brokers; they are the payloads of Raft entries, interpreted identically by every replica (owned by `ember-replication`). All integers big-endian.
@@ -207,6 +223,13 @@ These are not wire messages between clients and brokers; they are the payloads o
 | 11 | LEADER_NOT_AVAILABLE | the partition has no known leader right now (an election is going on). Retriable after a back-off |
 | 12 | NOT_CONTROLLER | CREATE_TOPIC sent to a broker that is not the leader of the META group. Retriable: METADATA v2 `controllerId` says where to go |
 | 13 | BROKER_OVERLOADED | too many produce requests are waiting for their commit in this partition. Retriable after a back-off |
+| 14 | NOT_COORDINATOR | a group API sent to a broker that is not the leader of the `__groups` Raft group. Retriable: FIND_COORDINATOR again |
+| 15 | UNKNOWN_MEMBER_ID | the group does not know this member (never joined, expired, or removed). The member must rejoin |
+| 16 | ILLEGAL_GENERATION | the generation in the request is not the group's current generation: the member is fenced (HEARTBEAT: newer than the leader knows; OFFSET_COMMIT: any mismatch) |
+| 17 | REBALANCE_IN_PROGRESS | HEARTBEAT with an older generation: the group changed; rejoin to learn the new assignment |
+| 18 | COORDINATOR_NOT_AVAILABLE | no `__groups` leader is known right now (an election is going on). Retriable after a back-off |
+| 19 | INVALID_SESSION_TIMEOUT | the session timeout is outside the broker's `--group-min-session-ms` .. `--group-max-session-ms` range. A caller bug |
+| 20 | PARTITION_NOT_ASSIGNED | OFFSET_COMMIT for a partition that is not assigned to this member. A caller bug |
 
 ## Semantics
 

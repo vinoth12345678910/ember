@@ -46,6 +46,7 @@ public final class ResponseCodec {
             case MetadataResponse m -> metadataSize(m, apiVersion);
             case CreateTopicResponse c -> stringSize(c.topic()) + 4;
             case ClusterMetadataResponse c -> clusterMetadataSize(c);
+            default -> GroupCodec.responseSize(body);
         });
         ByteBuffer buf = ByteBuffer.allocate(size);
         buf.putInt(correlationId);
@@ -109,6 +110,7 @@ public final class ResponseCodec {
                         }
                     }
                 }
+                default -> GroupCodec.encodeResponse(buf, body);
             }
         }
         buf.flip();
@@ -162,6 +164,8 @@ public final class ResponseCodec {
             case METADATA -> apiVersion >= 2 ? decodeClusterMetadata(buf) : decodeMetadata(buf, apiVersion);
             case RAFT_MESSAGE -> throw new ProtocolException("RAFT_MESSAGE is one-way: there is no response frame");
             case CREATE_TOPIC -> new CreateTopicResponse(getString(buf, "topic"), getInt(buf, "partitionCount"));
+            case FIND_COORDINATOR, JOIN_GROUP, HEARTBEAT, LEAVE_GROUP, OFFSET_COMMIT, OFFSET_FETCH, DESCRIBE_GROUP ->
+                    GroupCodec.decodeResponse(apiKey, buf);
         };
         requireNoTrailingBytes(buf);
         return new Decoded(correlationId, error, body);

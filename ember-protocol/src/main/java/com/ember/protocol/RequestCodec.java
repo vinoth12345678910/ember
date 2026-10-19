@@ -35,6 +35,7 @@ public final class RequestCodec {
             case MetadataRequest m -> metadataSize(m);
             case CreateTopicRequest c -> stringSize(c.topic()) + 4;
             case RaftMessageRequest r -> stringSize(r.groupTopic()) + 4 + 4 + RaftMessageCodec.size(r.message());
+            default -> GroupCodec.requestSize(request);
         };
         ByteBuffer buf = ByteBuffer.allocate(size);
         buf.putShort(header.apiKey().code());
@@ -78,6 +79,7 @@ public final class RequestCodec {
                     putString(buf, t);
                 }
             }
+            default -> GroupCodec.encodeRequest(buf, request);
         }
         buf.flip();
         return buf;
@@ -125,6 +127,8 @@ public final class RequestCodec {
                 case METADATA -> decodeMetadata(buf);
                 case CREATE_TOPIC -> decodeCreateTopic(buf);
                 case RAFT_MESSAGE -> decodeRaftMessage(buf);
+                case FIND_COORDINATOR, JOIN_GROUP, HEARTBEAT, LEAVE_GROUP, OFFSET_COMMIT, OFFSET_FETCH, DESCRIBE_GROUP ->
+                        GroupCodec.decodeRequest(apiKey, buf);
             };
             requireNoTrailingBytes(buf);
             return new Decoded(new RequestHeader(apiKey, version, correlationId), request);

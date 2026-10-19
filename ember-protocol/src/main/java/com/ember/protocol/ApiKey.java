@@ -6,7 +6,14 @@ public enum ApiKey {
     METADATA(2),
     CREATE_TOPIC(3),
     /** Broker-to-broker Raft traffic: one-way, no response frame. */
-    RAFT_MESSAGE(10);
+    RAFT_MESSAGE(10),
+    FIND_COORDINATOR(11),
+    JOIN_GROUP(12),
+    HEARTBEAT(13),
+    LEAVE_GROUP(14),
+    OFFSET_COMMIT(15),
+    OFFSET_FETCH(16),
+    DESCRIBE_GROUP(17);
 
     private final short code;
 

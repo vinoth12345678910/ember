@@ -42,7 +42,9 @@ public record BrokerConfig(
         int peerQueueSize,
         boolean unsafeNoRaftFsync,
         FlushPolicy dataFlush,          // flush policy of the DATA logs; the Raft logs are the durable truth
-        boolean dataFlushExplicit) {
+        boolean dataFlushExplicit,
+        int groupMinSessionMs,          // consumer-group session timeout bounds (Phase 6)
+        int groupMaxSessionMs) {
 
     public record ClusterMember(int nodeId, String host, int port) {
     }
@@ -91,6 +93,8 @@ public record BrokerConfig(
         boolean unsafeNoRaftFsync = false;
         FlushPolicy dataFlush = FlushPolicy.never();
         boolean dataFlushGiven = false;
+        int groupMinSessionMs = 1000;
+        int groupMaxSessionMs = 60_000;
 
         for (String arg : args) {
             int eq = arg.indexOf('=');
@@ -139,6 +143,8 @@ public record BrokerConfig(
                     case "produce-timeout-ms" -> produceTimeoutMs = Long.parseLong(value);
                     case "max-pending-produces" -> maxPendingProduces = Integer.parseInt(value);
                     case "peer-queue-size" -> peerQueueSize = Integer.parseInt(value);
+                    case "group-min-session-ms" -> groupMinSessionMs = Integer.parseInt(value);
+                    case "group-max-session-ms" -> groupMaxSessionMs = Integer.parseInt(value);
                     case "data-flush" -> {
                         dataFlush = parseDataFlush(value);
                         dataFlushGiven = true;
@@ -154,6 +160,9 @@ public record BrokerConfig(
         }
         if (raftHeartbeatMs <= 0 || raftElectionMinMs <= raftHeartbeatMs || raftElectionMaxMs < raftElectionMinMs) {
             throw new IllegalArgumentException("need 0 < raft-heartbeat-ms < raft-election-min-ms <= raft-election-max-ms");
+        }
+        if (groupMinSessionMs < 1 || groupMaxSessionMs < groupMinSessionMs) {
+            throw new IllegalArgumentException("need 1 <= group-min-session-ms <= group-max-session-ms");
         }
         if (!dataFlushGiven && legacyFlushGiven) {
             dataFlush = new FlushPolicy(flushMessages, flushMs);       // the Phase 3 flags still steer the data logs
@@ -172,7 +181,7 @@ public record BrokerConfig(
                 retentionMs, retentionBytes, maxFrameBytes, maxFetchBytes, idleTimeoutMs, autoCreateTopics, handlerThreads,
                 maintenanceIntervalMs, defaultPartitions, maxPartitionsPerTopic, List.copyOf(cluster),
                 raftElectionMinMs, raftElectionMaxMs, raftHeartbeatMs, produceTimeoutMs, maxPendingProduces, peerQueueSize,
-                unsafeNoRaftFsync, dataFlush, dataFlushGiven || legacyFlushGiven);
+                unsafeNoRaftFsync, dataFlush, dataFlushGiven || legacyFlushGiven, groupMinSessionMs, groupMaxSessionMs);
     }
 
     /** "1@host:9001,2@host:9002" */

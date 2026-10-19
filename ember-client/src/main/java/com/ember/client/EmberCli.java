@@ -27,8 +27,16 @@ public final class EmberCli {
               (all commands: --bootstrap=h1:p1,h2:p2 or --host/--port, --retries=N)
               create-topic --topic=t --partitions=N
               produce      --topic=t [--key=k] --value=v [--partitions=N]   (N: only used if the topic must be auto-created)
+              produce      --topic=t --count=N [--keys=100] [--value=order]   (N keyed records: key user-<i mod keys>, value <value>-<i>)
               fetch        --topic=t [--partition=0] [--offset=0] [--max-bytes=65536]
               consume      --topic=t [--from-beginning] [--follow]
+              consume      --group=g --topic=a,b [--from=earliest|latest] [--max=N] [--session-ms=10000] [--follow]   (consumer group)
+              group describe --group=g      (members, assignment, committed offsets, lag)
+              group offsets  --group=g
+              group commit-bench --group=g --topic=t [--count=2000]   (OFFSET_COMMIT latency percentiles)
+              group watch --group=g [--interval-ms=50] [--for-ms=60000]   (timestamped changes of generation/members/owned/committed)
+              group commit-probe --group=g --topic=t [--for-ms=20000]   (commit every 20 ms, print each outcome)
+              consume-bench --topic=t --expect=N --mode=manual|group [--auto-commit=true|false]   (steady-state read throughput)
               metadata     [--topic=t]
               bench        [--topic=t] [--partitions=3] [--producers=1] [--records=200000] [--value-bytes=100] [--batch=500]""";
 
@@ -38,7 +46,20 @@ public final class EmberCli {
     }
 
     public static void main(String[] args) {
-        System.exit(run(args, System.out, System.err));
+        // Ctrl+C / SIGTERM: let a running `consume --group` commit and leave the group before the JVM exits
+        java.util.concurrent.atomic.AtomicBoolean signalled = new java.util.concurrent.atomic.AtomicBoolean();
+        CountDownLatch finished = new CountDownLatch(1);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            signalled.set(true);
+            try {
+                finished.await(10, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "ember-cli-shutdown"));
+        int code = run(args, System.out, System.err, signalled::get);
+        finished.countDown();
+        System.exit(code);
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
@@ -55,13 +76,25 @@ public final class EmberCli {
             return 2;
         }
         try {
-            Flags flags = new Flags(args, 1);
+            boolean groupCommand = args[0].equals("group");
+            if (groupCommand && args.length < 2) {
+                throw new IllegalArgumentException("group needs a subcommand: describe or offsets");
+            }
+            Flags flags = new Flags(args, groupCommand ? 2 : 1);
             ClientConfig cfg = clientConfig(flags);
             switch (args[0]) {
                 case "create-topic" -> createTopic(cfg, flags, out);
                 case "produce" -> produce(cfg, flags, out);
                 case "fetch" -> fetch(cfg, flags, out);
-                case "consume" -> consume(cfg, flags, out, shouldStop);
+                case "consume" -> {
+                    if (flags.has("group")) {
+                        GroupCli.consume(cfg, flags, out, shouldStop);
+                    } else {
+                        consume(cfg, flags, out, shouldStop);
+                    }
+                }
+                case "group" -> GroupCli.run(args[1], cfg, flags, out);
+                case "consume-bench" -> GroupCli.consumeBench(cfg, flags, out);
                 case "metadata" -> metadata(cfg, flags, out);
                 case "bench" -> {
                     if (!bench(cfg, flags, out)) {
@@ -115,6 +148,10 @@ public final class EmberCli {
 
     private static void produce(ClientConfig base, Flags flags, PrintStream out) throws IOException {
         String topic = flags.require("topic");
+        if (flags.getInt("count", 0) > 0) {
+            produceMany(base, flags, topic, out);
+            return;
+        }
         String key = flags.get("key", null);
         String value = flags.require("value");
         ClientConfig config = base.withAutoCreate(true, flags.getInt("partitions", 3));
@@ -123,6 +160,21 @@ public final class EmberCli {
                     key == null ? null : key.getBytes(StandardCharsets.UTF_8), value.getBytes(StandardCharsets.UTF_8));
             out.println("partition=" + md.partition() + " offset=" + md.offset());
         }
+    }
+
+    /** N keyed records with ONE producer (a demo/test helper: one JVM per record would take minutes). */
+    private static void produceMany(ClientConfig base, Flags flags, String topic, PrintStream out) throws IOException {
+        int count = flags.getInt("count", 0);
+        int keys = Math.max(1, flags.getInt("keys", 100));
+        String prefix = flags.get("value", "order");
+        int start = flags.getInt("start", 0);
+        ClientConfig config = base.withAutoCreate(true, flags.getInt("partitions", 3));
+        try (EmberProducer producer = new EmberProducer(config)) {
+            for (int i = start; i < start + count; i++) {
+                producer.send(topic, ("user-" + (i % keys)).getBytes(StandardCharsets.UTF_8), (prefix + "-" + i).getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        out.println("produced " + count + " records to " + topic);
     }
 
     private static void fetch(ClientConfig cfg, Flags flags, PrintStream out) throws IOException {

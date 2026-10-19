@@ -81,6 +81,34 @@ final class RequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
                 }
                 case FetchRequest f -> handleFetch(ctx, correlationId, f, apis);
                 case RaftMessageRequest r -> throw new IllegalStateException("handled above");
+                case FindCoordinatorRequest f -> {
+                    BrokerApis.Outcome<FindCoordinatorResponse> out = apis.handleFindCoordinator(f);
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case JoinGroupRequest j -> {
+                    BrokerApis.Outcome<JoinGroupResponse> out = apis.handleJoinGroup(j);
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case HeartbeatRequest h -> {
+                    BrokerApis.Outcome<HeartbeatResponse> out = apis.handleHeartbeat(h);
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case LeaveGroupRequest l -> {
+                    BrokerApis.Outcome<LeaveGroupResponse> out = apis.handleLeaveGroup(l);
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case OffsetCommitRequest c -> {
+                    BrokerApis.Outcome<OffsetCommitResponse> out = apis.handleOffsetCommit(c);
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case OffsetFetchRequest f -> {
+                    BrokerApis.Outcome<OffsetFetchResponse> out = apis.handleOffsetFetch(f);
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case DescribeGroupRequest d -> {
+                    BrokerApis.Outcome<DescribeGroupResponse> out = apis.handleDescribeGroup(d);
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
             }
         } catch (Throwable t) {
             LOG.log(System.Logger.Level.ERROR, "internal error handling " + decoded.header().apiKey(), t);

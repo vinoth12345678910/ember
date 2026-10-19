@@ -54,7 +54,7 @@ final class TestCluster implements AutoCloseable {
                 "--node-id=" + i, "--port=" + ports[i], "--data-dir=" + base.resolve("broker-" + i),
                 "--segment-bytes=4096", "--index-interval-bytes=256", "--maintenance-interval-ms=3600000",
                 "--raft-election-min-ms=150", "--raft-election-max-ms=300", "--raft-heartbeat-ms=30",
-                "--handler-threads=16", "--produce-timeout-ms=5000", "--data-flush=never"));
+                "--handler-threads=16", "--produce-timeout-ms=5000", "--data-flush=never", "--group-min-session-ms=100"));
         flags.addAll(List.of(extraFlags));
         return BrokerConfig.parse(flags.toArray(new String[0]));
     }
@@ -146,6 +146,39 @@ final class TestCluster implements AutoCloseable {
         });
     }
 
+    // ---- consumer groups
+
+    /** The up broker that is the READY leader of "__groups" (the coordinator), or -1. */
+    int coordinator() {
+        for (int i = 1; i <= n; i++) {
+            if (servers[i] != null && servers[i].replicaManager().groupsGroup().isLeaderReady()) return i;
+        }
+        return -1;
+    }
+
+    int awaitCoordinator() {
+        Await.until(20_000, "a coordinator (leader of __groups)\n" + describe(), () -> coordinator() > 0);
+        return coordinator();
+    }
+
+    /** Waits until all up brokers hold the same replicated group state, and returns it (for assertions). */
+    java.util.Map<String, com.ember.replication.GroupStateMachine.GroupData> awaitGroupStateIdentical() {
+        Await.until(30_000, "identical __groups state on every up broker\n" + describe(), () -> {
+            java.util.Map<String, com.ember.replication.GroupStateMachine.GroupData> reference = null;
+            for (int i = 1; i <= n; i++) {
+                if (servers[i] == null) continue;
+                var snapshot = servers[i].replicaManager().groupState().snapshot();
+                if (reference == null) reference = snapshot;
+                else if (!reference.equals(snapshot)) return false;
+            }
+            return true;
+        });
+        for (int i = 1; i <= n; i++) {
+            if (servers[i] != null) return servers[i].replicaManager().groupState().snapshot();
+        }
+        return java.util.Map.of();
+    }
+
     // ---- network faults
 
     void isolate(int i) {
@@ -195,6 +228,14 @@ final class TestCluster implements AutoCloseable {
             sb.append("broker ").append(i).append(" meta: ").append(m.role()).append(" term=").append(m.term()).append(" leader=")
                     .append(m.leaderId()).append(" commit=").append(m.commitIndex()).append(" applied=").append(m.lastApplied())
                     .append(" last=").append(m.lastLogIndex()).append(" failed=").append(m.hasFailed()).append('\n');
+            var gg = rm.groupsGroup();
+            sb.append("   __groups: ").append(gg.role()).append(" term=").append(gg.term()).append(" leader=").append(gg.leaderId())
+                    .append(" commit=").append(gg.commitIndex()).append(" applied=").append(gg.lastApplied()).append(" ready=").append(gg.isLeaderReady()).append('\n');
+            rm.groupState().snapshot().forEach((id, data) -> {
+                sb.append("   group ").append(id).append(" generation=").append(data.generation()).append(" members={");
+                data.members().forEach((mid, member) -> sb.append(mid).append("->").append(member.assigned().size()).append("p "));
+                sb.append("} offsets=").append(data.offsets()).append('\n');
+            });
             for (var t : rm.topics()) {
                 for (var r : t.replicas()) {
                     var g = r.group();
