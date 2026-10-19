@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.ember.broker.PartitionedBrokerLifecycleTest
+-------------------------------------------------------------------------------
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.297 s -- in com.ember.broker.PartitionedBrokerLifecycleTest

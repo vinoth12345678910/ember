@@ -1,0 +1,10 @@
+com/ember/storage/FlushPolicy.class
+com/ember/storage/Segment$Extent.class
+com/ember/storage/LogRecord.class
+com/ember/storage/OffsetOutOfRangeException.class
+com/ember/storage/Segment.class
+com/ember/storage/LogSlice.class
+com/ember/storage/KeyValue.class
+com/ember/storage/Log.class
+com/ember/storage/CorruptRecordException.class
+com/ember/storage/OffsetIndex.class

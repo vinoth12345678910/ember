@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.ember.broker.ClusterSmokeTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.970 s -- in com.ember.broker.ClusterSmokeTest

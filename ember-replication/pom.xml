@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.ember</groupId>
+        <artifactId>ember-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>ember-replication</artifactId>
+    <name>Ember Replication</name>
+
+    <!-- Real threads and real files meet the pure Raft core here. NO Netty (the network lives in ember-broker). -->
+    <dependencies>
+        <dependency><groupId>com.ember</groupId><artifactId>ember-raft</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>com.ember</groupId><artifactId>ember-storage</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>com.ember</groupId><artifactId>ember-protocol</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    </dependencies>
+</project>

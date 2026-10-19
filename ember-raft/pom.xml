@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.ember</groupId>
+        <artifactId>ember-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>ember-raft</artifactId>
+    <name>Ember Raft</name>
+
+    <!-- The Raft core and its simulator depend on NOTHING (not even other Ember modules): that is what keeps them deterministic. -->
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <properties>
+        <!-- how many random seeds RandomizedSafetyTest runs; override with -Draft.seeds=N -->
+        <raft.seeds>300</raft.seeds>
+        <raft.seedStart>0</raft.seedStart>
+        <!-- tests tagged "slow" are skipped unless the raft-long profile is active -->
+        <raft.excludedGroups>slow</raft.excludedGroups>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${raft.excludedGroups}</excludedGroups>
+                    <systemPropertyVariables>
+                        <raft.seeds>${raft.seeds}</raft.seeds>
+                        <raft.seedStart>${raft.seedStart}</raft.seedStart>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>all</shadedClassifierName>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.ember.raft.sim.SimMain</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- mvn -pl ember-raft test -Praft-long : 5000 seeds and the tests tagged "slow" -->
+        <profile>
+            <id>raft-long</id>
+            <properties>
+                <raft.seeds>5000</raft.seeds>
+                <raft.excludedGroups>no-such-tag</raft.excludedGroups>
+            </properties>
+        </profile>
+    </profiles>
+</project>

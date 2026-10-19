@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.ember.protocol.Phase3CodecTest
+-------------------------------------------------------------------------------
+Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.ember.protocol.Phase3CodecTest

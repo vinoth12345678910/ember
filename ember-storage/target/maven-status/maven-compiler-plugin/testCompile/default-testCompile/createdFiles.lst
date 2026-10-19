@@ -1,0 +1,12 @@
+com/ember/storage/SegmentRecoveryTest.class
+com/ember/storage/FlushPolicyTest.class
+com/ember/storage/SegmentTest.class
+com/ember/storage/OffsetIndexTest.class
+com/ember/storage/LogConcurrencyTest.class
+com/ember/storage/RetentionTest.class
+com/ember/storage/SmokeTest.class
+com/ember/storage/SegmentSliceTest.class
+com/ember/storage/LogRecordTest.class
+com/ember/storage/ChaosTest.class
+com/ember/storage/LogSliceTest.class
+com/ember/storage/LogTest.class

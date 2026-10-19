@@ -1,0 +1,1268 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ember.broker.ClusterIntegrationTest" time="24.507" tests="12" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="java.specification.version" value="21"/>
+    <property name="sun.jnu.encoding" value="UTF-8"/>
+    <property name="java.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-broker/target/classes:/Users/vinothanandgani/Dev/ember/ember-replication/target/ember-replication-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-raft/target/ember-raft-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-protocol/target/ember-protocol-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-storage/target/ember-storage-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-handler/4.1.115.Final/netty-handler-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-common/4.1.115.Final/netty-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-resolver/4.1.115.Final/netty-resolver-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-buffer/4.1.115.Final/netty-buffer-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport/4.1.115.Final/netty-transport-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport-native-unix-common/4.1.115.Final/netty-transport-native-unix-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-codec/4.1.115.Final/netty-codec-4.1.115.Final.jar:/Users/vinothanandgani/Dev/ember/ember-client/target/ember-client-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
+    <property name="java.vm.vendor" value="Oracle Corporation"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="java.vendor.url" value="https://java.oracle.com/"/>
+    <property name="user.timezone" value="Asia/Kolkata"/>
+    <property name="os.name" value="Mac OS X"/>
+    <property name="java.vm.specification.version" value="21"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="IN"/>
+    <property name="sun.boot.library.path" value="/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home/lib"/>
+    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261018202052395_33.jar /Users/vinothanandgani/Dev/ember/ember-broker/target/surefire 2026-10-18T20-19-37_994-jvmRun1 surefire-20261018202052395_31tmp surefire_5-20261018202052395_32tmp"/>
+    <property name="http.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="surefire.test.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-broker/target/classes:/Users/vinothanandgani/Dev/ember/ember-replication/target/ember-replication-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-raft/target/ember-raft-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-protocol/target/ember-protocol-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-storage/target/ember-storage-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-handler/4.1.115.Final/netty-handler-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-common/4.1.115.Final/netty-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-resolver/4.1.115.Final/netty-resolver-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-buffer/4.1.115.Final/netty-buffer-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport/4.1.115.Final/netty-transport-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport-native-unix-common/4.1.115.Final/netty-transport-native-unix-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-codec/4.1.115.Final/netty-codec-4.1.115.Final.jar:/Users/vinothanandgani/Dev/ember/ember-client/target/ember-client-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="/Users/vinothanandgani"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2026-08-18"/>
+    <property name="java.home" value="/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home"/>
+    <property name="file.separator" value="/"/>
+    <property name="basedir" value="/Users/vinothanandgani/Dev/ember/ember-broker"/>
+    <property name="java.vm.compressedOopsMode" value="Non-zero disjoint base"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="apple.awt.application.name" value="ForkedBooter"/>
+    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261018202052395_33.jar"/>
+    <property name="cluster.seed" value="0"/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="ftp.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
+    <property name="java.runtime.version" value="21.0.12.1+1-LTS-4"/>
+    <property name="user.name" value="vinothanandgani"/>
+    <property name="stdout.encoding" value="UTF-8"/>
+    <property name="path.separator" value=":"/>
+    <property name="os.version" value="27.0.1"/>
+    <property name="java.runtime.name" value="Java(TM) SE Runtime Environment"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="java.vm.name" value="Java HotSpot(TM) 64-Bit Server VM"/>
+    <property name="localRepository" value="/Users/vinothanandgani/.m2/repository"/>
+    <property name="java.vendor.url.bug" value="https://bugreport.java.com/bugreport/"/>
+    <property name="java.io.tmpdir" value="/var/folders/yv/h6b1zpfn6ssd5sfdzjzcj6dw0000gn/T/"/>
+    <property name="java.version" value="21.0.12.1"/>
+    <property name="user.dir" value="/Users/vinothanandgani/Dev/ember/ember-broker"/>
+    <property name="os.arch" value="aarch64"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="native.encoding" value="UTF-8"/>
+    <property name="java.library.path" value="/Users/vinothanandgani/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="stderr.encoding" value="UTF-8"/>
+    <property name="java.vendor" value="Oracle Corporation"/>
+    <property name="java.vm.version" value="21.0.12.1+1-LTS-4"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeBig"/>
+    <property name="socksNonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
+    <property name="java.class.version" value="65.0"/>
+  </properties>
+  <testcase name="anIsolatedLeaderStepsDownAndItsUnacknowledgedProposalIsGoneAfterHealing(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="1.322">
+    <system-err><![CDATA[Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:16 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now LEADER in term 2 (leader 2)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 2 (leader 2)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now LEADER in term 2 (leader 1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 2 (leader 2)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:17 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 3 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="aTopicCreatedThroughANonControllerIsRedirectedAndAppearsEverywhere(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="0.831">
+    <system-err><![CDATA[Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic orders with 3 partition(s)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic orders with 3 partition(s)
+Oct 18, 2026 8:21:17 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic orders with 3 partition(s)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group orders-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group orders-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group orders-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group orders-0 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group orders-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group orders-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group orders-1 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group orders-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group orders-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group orders-1 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group orders-1 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group orders-1 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group orders-2 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group orders-2 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group orders-2 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group orders-2 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group orders-2 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group orders-2 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:18 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:18 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="leaderFailoverUnderContinuousProductionLosesNoAcknowledgedRecord(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="2.469">
+    <system-err><![CDATA[Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:18 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:19 PM com.ember.broker.RequestHandler exceptionCaught
+SEVERE: unexpected error on connection
+java.util.concurrent.RejectedExecutionException: event executor terminated
+	at io.netty.util.concurrent.SingleThreadEventExecutor.reject(SingleThreadEventExecutor.java:934)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.offerTask(SingleThreadEventExecutor.java:353)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.addTask(SingleThreadEventExecutor.java:346)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:836)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute0(SingleThreadEventExecutor.java:827)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:817)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelReadComplete(AbstractChannelHandlerContext.java:469)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelReadComplete(AbstractChannelHandlerContext.java:456)
+	at io.netty.channel.ChannelInboundHandlerAdapter.channelReadComplete(ChannelInboundHandlerAdapter.java:105)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelReadComplete(AbstractChannelHandlerContext.java:486)
+	at io.netty.channel.AbstractChannelHandlerContext.access$1900(AbstractChannelHandlerContext.java:61)
+	at io.netty.channel.AbstractChannelHandlerContext$Tasks$1.run(AbstractChannelHandlerContext.java:1298)
+	at io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:173)
+	at io.netty.util.concurrent.DefaultEventExecutor.run(DefaultEventExecutor.java:66)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+Oct 18, 2026 8:21:19 PM com.ember.broker.RequestHandler exceptionCaught
+SEVERE: unexpected error on connection
+java.util.concurrent.RejectedExecutionException: event executor terminated
+	at io.netty.util.concurrent.SingleThreadEventExecutor.reject(SingleThreadEventExecutor.java:934)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.offerTask(SingleThreadEventExecutor.java:353)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.addTask(SingleThreadEventExecutor.java:346)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:836)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute0(SingleThreadEventExecutor.java:827)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:817)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelInactive(AbstractChannelHandlerContext.java:283)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelInactive(AbstractChannelHandlerContext.java:274)
+	at io.netty.channel.ChannelInboundHandlerAdapter.channelInactive(ChannelInboundHandlerAdapter.java:81)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelInactive(AbstractChannelHandlerContext.java:303)
+	at io.netty.channel.AbstractChannelHandlerContext.access$300(AbstractChannelHandlerContext.java:61)
+	at io.netty.channel.AbstractChannelHandlerContext$4.run(AbstractChannelHandlerContext.java:286)
+	at io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:173)
+	at io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:166)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasksFrom(SingleThreadEventExecutor.java:428)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:377)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.confirmShutdown(SingleThreadEventExecutor.java:763)
+	at io.netty.util.concurrent.DefaultEventExecutor.run(DefaultEventExecutor.java:70)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+Oct 18, 2026 8:21:19 PM com.ember.broker.RequestHandler exceptionCaught
+SEVERE: unexpected error on connection
+java.util.concurrent.RejectedExecutionException: event executor terminated
+	at io.netty.util.concurrent.SingleThreadEventExecutor.reject(SingleThreadEventExecutor.java:934)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.offerTask(SingleThreadEventExecutor.java:353)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.addTask(SingleThreadEventExecutor.java:346)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:836)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute0(SingleThreadEventExecutor.java:827)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:817)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelUnregistered(AbstractChannelHandlerContext.java:197)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelUnregistered(AbstractChannelHandlerContext.java:188)
+	at io.netty.channel.ChannelInboundHandlerAdapter.channelUnregistered(ChannelInboundHandlerAdapter.java:57)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelUnregistered(AbstractChannelHandlerContext.java:217)
+	at io.netty.channel.AbstractChannelHandlerContext.access$100(AbstractChannelHandlerContext.java:61)
+	at io.netty.channel.AbstractChannelHandlerContext$2.run(AbstractChannelHandlerContext.java:200)
+	at io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:173)
+	at io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:166)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasksFrom(SingleThreadEventExecutor.java:428)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:377)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.confirmShutdown(SingleThreadEventExecutor.java:763)
+	at io.netty.util.concurrent.DefaultEventExecutor.run(DefaultEventExecutor.java:70)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+Oct 18, 2026 8:21:19 PM io.netty.util.concurrent.AbstractEventExecutor safeExecute
+WARNING: A task raised an exception. Task: io.netty.channel.DefaultChannelPipeline$4@2a2d0e61
+java.util.concurrent.RejectedExecutionException: event executor terminated
+	at io.netty.util.concurrent.SingleThreadEventExecutor.reject(SingleThreadEventExecutor.java:934)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.offerTask(SingleThreadEventExecutor.java:353)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.addTask(SingleThreadEventExecutor.java:346)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:836)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute0(SingleThreadEventExecutor.java:827)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:817)
+	at io.netty.channel.DefaultChannelPipeline.destroyDown(DefaultChannelPipeline.java:828)
+	at io.netty.channel.DefaultChannelPipeline.destroyUp(DefaultChannelPipeline.java:793)
+	at io.netty.channel.DefaultChannelPipeline.access$200(DefaultChannelPipeline.java:45)
+	at io.netty.channel.DefaultChannelPipeline$4.run(DefaultChannelPipeline.java:803)
+	at io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:173)
+	at io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:166)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasksFrom(SingleThreadEventExecutor.java:428)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:377)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.confirmShutdown(SingleThreadEventExecutor.java:763)
+	at io.netty.util.concurrent.DefaultEventExecutor.run(DefaultEventExecutor.java:70)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+Oct 18, 2026 8:21:19 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped (crash)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now LEADER in term 2 (leader 3)
+Oct 18, 2026 8:21:19 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now LEADER in term 4 (leader 1)
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 4 (leader 1)
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 4 (leader 1)
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:20 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:20 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:20 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 5 (leader -1)
+Oct 18, 2026 8:21:20 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="createTopicWhileTheControllerCrashesLeavesExactlyOneTopic(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="2.038">
+    <system-err><![CDATA[Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:21 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped (crash)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now LEADER in term 2 (leader 1)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic racy with 4 partition(s)
+Oct 18, 2026 8:21:21 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic racy with 4 partition(s)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group racy-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group racy-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group racy-0 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group racy-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group racy-1 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group racy-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group racy-1 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group racy-1 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group racy-2 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group racy-2 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group racy-2 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group racy-2 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group racy-3 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group racy-3 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group racy-3 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group racy-3 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 4 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now LEADER in term 4 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 4 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 4 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic racy with 4 partition(s)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-3 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-2 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-3 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-2 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-1 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:22 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:22 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-2 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group racy-3 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:22 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="aCrashedBrokerRestartsAndCatchesUpByItself(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="2.683">
+    <system-err><![CDATA[Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-1 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-1 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-1 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-1 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped (crash)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now LEADER in term 2 (leader 3)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now LEADER in term 2 (leader 2)
+Oct 18, 2026 8:21:23 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 2 (leader 2)
+Oct 18, 2026 8:21:24 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:24 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:24 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now CANDIDATE in term 4 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now LEADER in term 4 (leader 2)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 4 (leader 2)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 4 (leader 2)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-1 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 2 (leader 2)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now CANDIDATE in term 3 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:25 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now CANDIDATE in term 4 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="withTwoOfThreeBrokersDownNothingIsAcknowledgedAndProgressResumesWhenOneReturns(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="2.507">
+    <system-err><![CDATA[Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:25 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:26 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped (crash)
+Oct 18, 2026 8:21:26 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped (crash)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:26 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now LEADER in term 4 (leader 2)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 4 (leader 2)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now LEADER in term 3 (leader 2)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 3 (leader 2)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 5 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 5 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 5 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 6 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 6 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now LEADER in term 6 (leader 1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 6 (leader 1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 6 (leader 1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:27 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 3 (leader 2)
+Oct 18, 2026 8:21:27 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:28 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:28 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="keyedOrderingHoldsAcrossAThreeBrokerCluster(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="3.852">
+    <system-err><![CDATA[Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic ordered with 3 partition(s)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic ordered with 3 partition(s)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic ordered with 3 partition(s)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group ordered-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group ordered-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group ordered-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group ordered-0 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group ordered-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group ordered-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group ordered-1 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group ordered-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group ordered-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group ordered-1 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group ordered-1 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group ordered-1 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group ordered-2 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group ordered-2 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group ordered-2 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group ordered-2 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group ordered-2 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:28 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group ordered-2 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:31 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:31 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:32 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="withFsyncOnAcknowledgedDataSurvivesACrashOfEveryBroker(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="1.866">
+    <system-err><![CDATA[Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-1 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-1 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-1 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-1 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:32 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:33 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped (crash)
+Oct 18, 2026 8:21:33 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped (crash)
+Oct 18, 2026 8:21:33 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped (crash)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now LEADER in term 2 (leader 3)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 2 partition(s)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now LEADER in term 2 (leader 1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-1 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-1 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-1 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-1 is now LEADER in term 2 (leader 3)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-1 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:33 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-1 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:33 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:33 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:33 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="aWholeClusterRestartKeepsTopicsAndDataAndKeepsWorking(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="2.019">
+    <system-err><![CDATA[Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic a with 3 partition(s)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic a with 3 partition(s)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic a with 3 partition(s)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-1 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-1 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-1 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-1 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-1 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-2 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-2 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-2 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-2 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-0 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-2 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-2 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic b with 1 partition(s)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic b with 1 partition(s)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic b with 1 partition(s)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group b-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group b-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group b-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group b-0 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group b-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group b-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:34 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:34 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:34 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-2 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now LEADER in term 2 (leader 3)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic a with 3 partition(s)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic b with 1 partition(s)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic a with 3 partition(s)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic a with 3 partition(s)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic b with 1 partition(s)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic b with 1 partition(s)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-0 is now LEADER in term 2 (leader 2)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-0 is now FOLLOWER in term 2 (leader 2)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-0 is now FOLLOWER in term 2 (leader 2)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-1 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-1 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-1 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-1 is now LEADER in term 2 (leader 3)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-1 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-1 is now FOLLOWER in term 2 (leader 3)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group b-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group b-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group b-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group b-0 is now LEADER in term 2 (leader 1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group b-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group b-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-2 is now CANDIDATE in term 3 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-2 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group a-2 is now LEADER in term 3 (leader 3)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-2 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group a-2 is now FOLLOWER in term 3 (leader 3)
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group a-2 is now FOLLOWER in term 3 (leader 3)
+Oct 18, 2026 8:21:35 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:35 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:35 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group b-0 is now CANDIDATE in term 3 (leader -1)
+Oct 18, 2026 8:21:35 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="producedRecordsAreByteExactOnEveryReplica(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="0.962">
+    <system-err><![CDATA[Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now LEADER in term 1 (leader 1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 1 (leader 1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now LEADER in term 1 (leader 3)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader 3)
+Oct 18, 2026 8:21:36 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:36 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:36 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:36 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="fiveBrokersTolerateTwoFailuresButNotThree(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="2.638">
+    <system-err><![CDATA[Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 5: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 4: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group t-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group t-0 is now LEADER in term 1 (leader 5)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader 5)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 1 (leader 5)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group t-0 is now FOLLOWER in term 1 (leader 5)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader 5)
+Oct 18, 2026 8:21:37 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped (crash)
+Oct 18, 2026 8:21:37 PM io.netty.util.concurrent.SingleThreadEventExecutor$4 run
+WARNING: Unexpected exception from an event executor: 
+java.util.concurrent.RejectedExecutionException: event executor terminated
+	at io.netty.util.concurrent.SingleThreadEventExecutor.reject(SingleThreadEventExecutor.java:934)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.offerTask(SingleThreadEventExecutor.java:353)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.addTask(SingleThreadEventExecutor.java:346)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:836)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute0(SingleThreadEventExecutor.java:827)
+	at io.netty.util.concurrent.SingleThreadEventExecutor.execute(SingleThreadEventExecutor.java:817)
+	at io.netty.channel.DefaultChannelPipeline.destroyDown(DefaultChannelPipeline.java:828)
+	at io.netty.channel.DefaultChannelPipeline.destroyUp(DefaultChannelPipeline.java:793)
+	at io.netty.channel.DefaultChannelPipeline.access$200(DefaultChannelPipeline.java:45)
+	at io.netty.channel.DefaultChannelPipeline$4.run(DefaultChannelPipeline.java:803)
+	at io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:173)
+	at io.netty.util.concurrent.DefaultEventExecutor.run(DefaultEventExecutor.java:66)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+Oct 18, 2026 8:21:37 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped (crash)
+Oct 18, 2026 8:21:37 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped (crash)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group t-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group __meta-0 is now CANDIDATE in term 4 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group __meta-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group t-0 is now CANDIDATE in term 3 (leader -1)
+Oct 18, 2026 8:21:37 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group t-0 is now FOLLOWER in term 3 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group __meta-0 is now LEADER in term 4 (leader 5)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group __meta-0 is now FOLLOWER in term 4 (leader 5)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 4 (leader 5)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group t-0 is now CANDIDATE in term 4 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group t-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group t-0 is now LEADER in term 4 (leader 5)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 4 (leader 5)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group t-0 is now FOLLOWER in term 4 (leader 5)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 3 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now CANDIDATE in term 5 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group __meta-0 is now FOLLOWER in term 5 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 5 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group __meta-0 is now FOLLOWER in term 5 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group __meta-0 is now CANDIDATE in term 7 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 7 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 4: group __meta-0 is now LEADER in term 7 (leader 4)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 7 (leader 4)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 7 (leader 4)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 7 (leader 4)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group __meta-0 is now FOLLOWER in term 7 (leader 4)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 4 (leader 5)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:38 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 4 (leader 5)
+Oct 18, 2026 8:21:39 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:39 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:39 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+Oct 18, 2026 8:21:39 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 4 stopped
+Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 5: group t-0 is now FOLLOWER in term 4 (leader -1)
+Oct 18, 2026 8:21:39 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 5 stopped
+]]></system-err>
+  </testcase>
+  <testcase name="aBrokerWhoseDataLogWasDeletedRebuildsItFromItsRaftLog(Path)" classname="com.ember.broker.ClusterIntegrationTest" time="1.311">
+    <system-err><![CDATA[Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 3: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:39 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 1: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now CANDIDATE in term 1 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now LEADER in term 1 (leader 2)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 1 (leader 2)
+Oct 18, 2026 8:21:40 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group t-0 is now LEADER in term 2 (leader 1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now CANDIDATE in term 2 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 1: group __meta-0 is now LEADER in term 2 (leader 1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group __meta-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager createPartitionGroups
+INFO: broker 2: created topic t with 1 partition(s)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 2 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 2: group t-0 is now FOLLOWER in term 2 (leader 1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 1 stopped
+Oct 18, 2026 8:21:40 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 2 stopped
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group __meta-0 is now CANDIDATE in term 3 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 3: group t-0 is now CANDIDATE in term 3 (leader -1)
+Oct 18, 2026 8:21:40 PM com.ember.broker.BrokerServer shutdown
+INFO: broker 3 stopped
+]]></system-err>
+  </testcase>
+</testsuite>

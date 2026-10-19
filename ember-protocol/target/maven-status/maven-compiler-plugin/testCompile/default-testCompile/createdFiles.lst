@@ -1,0 +1,7 @@
+com/ember/protocol/SmokeTest.class
+com/ember/protocol/Phase5CodecTest.class
+com/ember/protocol/Phase3CodecTest.class
+com/ember/protocol/PartitionerTest.class
+com/ember/protocol/MalformedRequestTest.class
+com/ember/protocol/CodecRoundTripTest.class
+com/ember/protocol/MalformedRequestTest$ByteBufferWriter.class

@@ -1,0 +1,6 @@
+com/ember/client/ClusterClientTest.class
+com/ember/client/FakeServer$Script.class
+com/ember/client/SmokeTest.class
+com/ember/client/FakeServer$Connection.class
+com/ember/client/FakeServer.class
+com/ember/client/EmberClientTest.class
