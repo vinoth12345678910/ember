@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.ember.raft.sim.RandomizedSafetyTest
 -------------------------------------------------------------------------------
-Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.123 s -- in com.ember.raft.sim.RandomizedSafetyTest
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.979 s -- in com.ember.raft.sim.RandomizedSafetyTest

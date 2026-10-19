@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ember.broker.CliTest" time="5.12" tests="9" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ember.broker.CliTest" time="5.118" tests="9" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -13,7 +13,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="IN"/>
     <property name="sun.boot.library.path" value="/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home/lib"/>
-    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261018202052395_33.jar /Users/vinothanandgani/Dev/ember/ember-broker/target/surefire 2026-10-18T20-19-37_994-jvmRun1 surefire-20261018202052395_31tmp surefire_5-20261018202052395_32tmp"/>
+    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261019171425198_33.jar /Users/vinothanandgani/Dev/ember/ember-broker/target/surefire 2026-10-19T17-13-12_243-jvmRun1 surefire-20261019171425198_31tmp surefire_5-20261019171425198_32tmp"/>
     <property name="http.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-broker/target/classes:/Users/vinothanandgani/Dev/ember/ember-replication/target/ember-replication-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-raft/target/ember-raft-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-protocol/target/ember-protocol-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-storage/target/ember-storage-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-handler/4.1.115.Final/netty-handler-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-common/4.1.115.Final/netty-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-resolver/4.1.115.Final/netty-resolver-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-buffer/4.1.115.Final/netty-buffer-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport/4.1.115.Final/netty-transport-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport-native-unix-common/4.1.115.Final/netty-transport-native-unix-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-codec/4.1.115.Final/netty-codec-4.1.115.Final.jar:/Users/vinothanandgani/Dev/ember/ember-client/target/ember-client-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
@@ -30,7 +30,7 @@
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="apple.awt.application.name" value="ForkedBooter"/>
-    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261018202052395_33.jar"/>
+    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261019171425198_33.jar"/>
     <property name="cluster.seed" value="0"/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="ftp.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
@@ -59,216 +59,216 @@
     <property name="socksNonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="java.class.version" value="65.0"/>
   </properties>
-  <testcase name="produceAutoCreatesWithThePartitionsFlag(Path)" classname="com.ember.broker.CliTest" time="0.335">
-    <system-err><![CDATA[Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="produceAutoCreatesWithThePartitionsFlag(Path)" classname="com.ember.broker.CliTest" time="0.318">
+    <system-err><![CDATA[Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic auto with 5 partition(s)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group auto-1 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group auto-1 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group auto-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group auto-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group auto-2 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group auto-2 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group auto-4 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group auto-4 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group auto-0 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group auto-0 is now LEADER in term 1 (leader 0)
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group auto-1 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group auto-1 is now LEADER in term 1 (leader 0)
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group auto-2 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group auto-2 is now LEADER in term 1 (leader 0)
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group auto-3 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:08 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group auto-3 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:09 PM com.ember.broker.BrokerServer shutdown
+Oct 19, 2026 5:16:47 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="errorsGiveNonZeroExitCodes(Path)" classname="com.ember.broker.CliTest" time="0.898">
-    <system-err><![CDATA[Oct 18, 2026 8:22:09 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="errorsGiveNonZeroExitCodes(Path)" classname="com.ember.broker.CliTest" time="0.933">
+    <system-err><![CDATA[Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:09 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:10 PM com.ember.broker.BrokerServer shutdown
+Oct 19, 2026 5:16:48 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="keyedProducePrintsPartitionAndOffsetAndTheSameKeyStaysPut(Path)" classname="com.ember.broker.CliTest" time="0.319">
-    <system-err><![CDATA[Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="keyedProducePrintsPartitionAndOffsetAndTheSameKeyStaysPut(Path)" classname="com.ember.broker.CliTest" time="0.321">
+    <system-err><![CDATA[Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic t with 4 partition(s)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-1 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-1 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-3 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-3 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-2 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-2 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:10 PM com.ember.broker.BrokerServer shutdown
+Oct 19, 2026 5:16:48 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="fetchReadsOneChosenPartition(Path)" classname="com.ember.broker.CliTest" time="1.034">
-    <system-err><![CDATA[Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="fetchReadsOneChosenPartition(Path)" classname="com.ember.broker.CliTest" time="1.064">
+    <system-err><![CDATA[Oct 19, 2026 5:16:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 19, 2026 5:16:49 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic t with 3 partition(s)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group t-2 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group t-2 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group t-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-1 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-1 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:10 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group t-0 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:11 PM com.ember.broker.BrokerServer shutdown
+Oct 19, 2026 5:16:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group t-2 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group t-2 is now LEADER in term 1 (leader 0)
+Oct 19, 2026 5:16:50 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="consumeFollowKeepsPollingUntilToldToStop(Path)" classname="com.ember.broker.CliTest" time="0.533">
-    <system-err><![CDATA[Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="consumeFollowKeepsPollingUntilToldToStop(Path)" classname="com.ember.broker.CliTest" time="0.542">
+    <system-err><![CDATA[Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic t with 2 partition(s)
-Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-1 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-1 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:11 PM com.ember.broker.BrokerServer shutdown
+Oct 19, 2026 5:16:50 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="consumeFromBeginningPrintsEverythingAndStopsWhenCaughtUp(Path)" classname="com.ember.broker.CliTest" time="0.353">
-    <system-err><![CDATA[Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="consumeFromBeginningPrintsEverythingAndStopsWhenCaughtUp(Path)" classname="com.ember.broker.CliTest" time="0.337">
+    <system-err><![CDATA[Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:11 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic t with 3 partition(s)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group t-1 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group t-1 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group t-2 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group t-2 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.BrokerServer shutdown
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group t-2 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group t-2 is now LEADER in term 1 (leader 0)
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group t-1 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group t-1 is now LEADER in term 1 (leader 0)
+Oct 19, 2026 5:16:50 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="createTopicAndTheDuplicateError(Path)" classname="com.ember.broker.CliTest" time="0.202">
-    <system-err><![CDATA[Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="createTopicAndTheDuplicateError(Path)" classname="com.ember.broker.CliTest" time="0.196">
+    <system-err><![CDATA[Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic orders with 4 partition(s)
-Oct 18, 2026 8:22:12 PM com.ember.broker.RequestHandler channelRead0
-INFO: bad request from /127.0.0.1:50953: partitionCount must be >= 1
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.RequestHandler channelRead0
+INFO: bad request from /127.0.0.1:54308: partitionCount must be >= 1
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group orders-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group orders-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group orders-3 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group orders-3 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group orders-2 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group orders-2 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group orders-1 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group orders-1 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.BrokerServer shutdown
+Oct 19, 2026 5:16:51 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="metadataPrintsATable(Path)" classname="com.ember.broker.CliTest" time="0.324">
-    <system-err><![CDATA[Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="metadataPrintsATable(Path)" classname="com.ember.broker.CliTest" time="0.29">
+    <system-err><![CDATA[Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic alpha with 2 partition(s)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic beta with 1 partition(s)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group alpha-1 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group alpha-1 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group beta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group beta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group alpha-1 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group alpha-1 is now LEADER in term 1 (leader 0)
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group alpha-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group alpha-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.BrokerServer shutdown
+Oct 19, 2026 5:16:51 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="benchWithSeveralProducersVerifiesItsOwnResult(Path)" classname="com.ember.broker.CliTest" time="1.113">
-    <system-err><![CDATA[Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="benchWithSeveralProducersVerifiesItsOwnResult(Path)" classname="com.ember.broker.CliTest" time="1.111">
+    <system-err><![CDATA[Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic b1 with 4 partition(s)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group b1-2 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group b1-2 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group b1-1 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group b1-3 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group b1-3 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group b1-1 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group b1-1 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group b1-2 is now CANDIDATE in term 1 (leader -1)
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group b1-2 is now LEADER in term 1 (leader 0)
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group b1-0 is now CANDIDATE in term 1 (leader -1)
-Oct 18, 2026 8:22:12 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 19, 2026 5:16:51 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group b1-0 is now LEADER in term 1 (leader 0)
-Oct 18, 2026 8:22:13 PM com.ember.broker.BrokerServer shutdown
+Oct 19, 2026 5:16:52 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
