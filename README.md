@@ -4,19 +4,21 @@ A Kafka-style message broker written from scratch in plain Java 21, to learn dis
 Phase 1 built the storage engine (log segments, index, recovery, retention, fsync policy).
 Phase 2 added the network layer: a binary wire protocol, a Netty broker, a blocking client and a CLI, with zero-copy fetch.
 Phase 3 added **partitions**: a topic is N independent logs, producers route records by key (murmur2) or round-robin, consumers read any partition, and topics survive restarts with their partition count intact.
-**Phase 4 (this one)** builds **Raft consensus in isolation**: a pure, deterministic Raft core (`ember-raft`) and a simulator that attacks it with thousands of failure schedules, checking all five Raft safety properties after every event. It is not wired into the broker yet (Phase 5).
+Phase 4 built **Raft consensus in isolation**: a pure, deterministic Raft core (`ember-raft`) and a simulator that attacks it with thousands of failure schedules.
+**Phase 5 (this one)** makes partitions **replicated**: a cluster of 1, 3 or 5 brokers where every partition (and the topic metadata) is its own Raft group. A produce is acknowledged only after a majority has it and the leader has applied it. Leaders can die (`kill -9`) without losing an acknowledged record, and a restarted broker catches up by itself. Design: [`docs/phase5/design.md`](docs/phase5/design.md).
 
 ## Modules
 
 | Module | What it is | Depends on |
 |--------|-----------|------------|
 | `ember-storage` | `Log`, `Segment`, `LogRecord`, index, retention, flush policy; thread-safe; `openSlice` for zero-copy | nothing |
-| `ember-protocol` | request/response types and codecs (pure `ByteBuffer`), `Partitioner` (murmur2 + round-robin) | storage (for `LogRecord`) |
-| `ember-broker` | Netty server, `LogManager` (topic -> partitions -> logs), `BrokerApis`, data-dir lock, `EmberBroker` main | protocol, storage, Netty |
-| `ember-client` | blocking `EmberClient`, `EmberProducer`, `EmberConsumer`, `EmberCli` (plain sockets) | protocol |
+| `ember-protocol` | request/response types and codecs (pure `ByteBuffer`), `Partitioner` (murmur2 + round-robin), METADATA v2, RAFT_MESSAGE | storage, raft |
+| `ember-replication` | `FileRaftStorage`, `GroupRuntime` (serial mailbox + timers + propose-and-wait around one `RaftNode`), `PartitionStateMachine` (idempotent apply into the data log), `MetadataStateMachine`, `LocalTransport` | raft, storage, protocol |
+| `ember-broker` | Netty server, `ReplicaManager` (META group + one Raft group per partition), `PeerNetwork`, `BrokerApis`, `EmberBroker` main | replication, protocol, storage, Netty |
+| `ember-client` | `ClusterClient` (leader routing, controller redirect, retries), `EmberProducer`, `EmberConsumer`, `EmberCli` | protocol |
 | `ember-raft` | `RaftNode` (leader election + log replication, single-threaded, deterministic), `RaftStorage`, and the simulator `com.ember.raft.sim` (`SimCluster`, invariant checkers, random scenarios, `SimMain`) | nothing (JUnit for tests) |
 
-Docs: [`docs/PROTOCOL.md`](docs/PROTOCOL.md) (byte layouts, hex dump, semantics), `docs/phase2/` (one note per step explaining the *why*), `docs/phase3/` (the same for Phase 3, plus `bench.md`), `docs/phase4/` (Raft: one note per step, `raft-rules-to-code.md`, `simulator.md`, `bug-injection.md`, `phase5-notes.md`), `docs/ember-part3-notebooklm.md`, `docs/ember-part4-notebooklm.md`, `docs/ember-part5-notebooklm.md`.
+Docs: [`docs/PROTOCOL.md`](docs/PROTOCOL.md) (byte layouts, hex dump, semantics), `docs/phase2/` (one note per step explaining the *why*), `docs/phase3/` (the same for Phase 3, plus `bench.md`), `docs/phase4/` (Raft: one note per step, `raft-rules-to-code.md`, `simulator.md`, `bug-injection.md`, `phase5-notes.md`), `docs/phase5/` (replication: one note per step and `design.md` with the failure matrix), `docs/ember-part6-notebooklm.md`, `docs/ember-part3-notebooklm.md`, `docs/ember-part4-notebooklm.md`, `docs/ember-part5-notebooklm.md`.
 
 ## Build
 
@@ -34,6 +36,28 @@ java -jar ember-broker/target/ember-broker-0.1.0-SNAPSHOT-all.jar --port=9099 --
 ```
 
 Flags (`--name=value`): `node-id` (0), `host` (localhost, advertised in METADATA), `port` (9099, 0 = any free port), `data-dir` (./ember-data), `segment-bytes` (64 MiB), `index-interval-bytes` (4096), `flush-messages` (never), `flush-ms` (1000), `retention-ms` (7 days), `retention-bytes` (unlimited), `default-partitions` (3, for auto-created topics), `max-partitions` (256), `max-frame-bytes` (8 MiB), `max-fetch-bytes` (1 MiB), `idle-timeout-ms` (300000), `auto-create-topics` (true), `handler-threads` (4), `maintenance-interval-ms` (250). For the limits, `never` / `unlimited` mean "off". Ctrl+C or SIGTERM shuts down cleanly (in-flight requests finish, every log is fsynced).
+
+## Run a 3-broker cluster (Phase 5)
+
+```
+mvn -q package -DskipTests
+scripts/run-cluster.sh 3 19001 ./cluster-data          # N, first port, data root (extra flags after, e.g. --unsafe-no-raft-fsync)
+CLI="java -jar ember-client/target/ember-client-0.1.0-SNAPSHOT-all.jar --bootstrap=localhost:19001,localhost:19002,localhost:19003"
+$CLI create-topic --topic=orders --partitions=3
+$CLI produce --topic=orders --key=user-1 --value=hello
+$CLI metadata --topic=orders                           # brokers, controller, per-partition leader / replicas / offsets
+$CLI consume --topic=orders --from-beginning
+kill -9 $(cat cluster-data/broker-1.pid)               # crash a broker; the client keeps working
+scripts/run-cluster.sh 3 19001 ./cluster-data          # restarts only the dead one; it catches up by itself
+scripts/stop-cluster.sh ./cluster-data
+scripts/demo-failover.sh                               # the whole kill -9 demo with checks
+```
+
+Cluster flags: `--node-id=N --cluster=1@host:port,2@host:port,3@host:port` (same list on every broker; must contain self; data port = Raft port), `--raft-election-min-ms` (300), `--raft-election-max-ms` (600), `--raft-heartbeat-ms` (100), `--produce-timeout-ms` (5000), `--max-pending-produces` (1000), `--peer-queue-size` (10000), `--data-flush=never|message|<N>ms`, and `--unsafe-no-raft-fsync` (**unsafe**: acknowledged data can be lost on power failure; for benchmarks only). Without `--cluster` the broker is a cluster of one on the same code path. Phase 2 data directories are refused with a clear message (no migration).
+
+Measured on one laptop (Apple M4, 3 broker processes + CLI on the same machine): kill -9 of a partition leader -> first acknowledged produce after **0.82 / 0.84 / 1.65 s** (min / median / max of 5); 4 partitions x 4 producers x 100 B x 50,000 records: 1 broker with Raft 22.8k records/s, 3 brokers fsync ON 10.9k records/s, 3 brokers without Raft fsync 42.1k records/s. Details in `docs/phase5/step9-real-processes.md`.
+
+**Guarantees:** an acknowledged produce is on a majority of Raft logs and never lost or reordered while a majority survives; replicas converge byte for byte. **Not guaranteed:** exactly-once (retries can duplicate), availability without a majority, linearizable reads from a just-deposed leader. No snapshots yet: the Raft log grows and a restart replays it.
 
 ## Raft simulator (Phase 4)
 
@@ -121,6 +145,6 @@ try (EmberConsumer consumer = new EmberConsumer("localhost", 9099)) {
 
 **Ordering:** records are ordered within a partition; records with the same key are ordered (same partition); there is no ordering across partitions.
 
-## Known limitations (Phase 3)
+## Known limitations (through Phase 5)
 
-The partition count of a topic is fixed at creation and topics cannot be deleted; PRODUCE and FETCH name one partition per request; one request in flight per connection; partitioning is done by the client (all clients must use the same algorithm); consumer positions live in memory only (no groups, no committed offsets); a single broker, so the "leader" is always this node and there is no failover; no TLS/auth/compression; no replication yet (Raft exists only as an isolated, simulated component); no long-poll fetch; at-least-once produce; no write back-pressure for very slow readers; every segment keeps its files open. See `docs/phase3/` for the reasoning.
+The partition count of a topic is fixed at creation and topics cannot be deleted; replication factor = cluster size, with no adding or removing brokers; no Raft snapshots (the Raft log grows, restart replays it); PRODUCE and FETCH name one partition per request; one request in flight per connection; consumer positions live in the client (no groups or committed offsets yet); no TLS/auth (peers are trusted); no compression; no long-poll fetch; at-least-once produce (retries may duplicate); every record is written twice (Raft log + data log). See `docs/phase5/design.md` section 7.

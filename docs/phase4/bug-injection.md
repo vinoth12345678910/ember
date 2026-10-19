@@ -4,10 +4,10 @@ Each `Bug` is one small, clearly commented `if (config.injectedBug() == Bug.X)` 
 
 | Injected bug | What is wrong | Law broken | First caught by | Seeds needed | Violations over 3,000 seeds |
 |---|---|---|---|---|---|
-| `VOTE_WITHOUT_LOG_CHECK` | grants votes without comparing logs (5.4.1) | Leader Completeness | LeaderCompleteness | **1** (seed 0) | LeaderCompleteness 2,815; StateMachineSafety 1 |
-| `TRUNCATE_ON_EVERY_APPEND` | follower truncates even when entries match (R12) | Log Matching / commit safety | CommitIndexBounded (a follower dropped entries it knew were committed) | **4** (seed 3) | CommitIndexBounded 315; LeaderCompleteness 2; liveness failures 1,530 (the cluster cannot make progress) |
-| `ACK_BEFORE_SYNC` | replies before `sync()` (outbox reversed) | Election Safety (lost votes), Leader Completeness (lost acked entries) | ElectionSafety | **165** (seed 164) | ElectionSafety 42; LeaderCompleteness 2; StateMachineSafety 1 |
-| `FORGET_VOTED_FOR_ON_RESTART` | votedFor cleared on restart | Election Safety | ElectionSafety | **165** (seed 164) | ElectionSafety 46 |
+| `VOTE_WITHOUT_LOG_CHECK` | grants votes without comparing logs (5.4.1) | Leader Completeness | LeaderCompleteness | **1** (seed 0) | LeaderCompleteness 2,864; StateMachineSafety 1 |
+| `TRUNCATE_ON_EVERY_APPEND` | follower truncates even when entries match (R12) | Log Matching / commit safety | CommitIndexBounded (a follower dropped entries it knew were committed) | **2** (seed 1) | CommitIndexBounded 332; LeaderCompleteness 5; liveness failures 1,534 (the cluster cannot make progress) |
+| `ACK_BEFORE_SYNC` | replies before `sync()` (outbox reversed) | Election Safety (lost votes), Leader Completeness (lost acked entries) | ElectionSafety | **67** (seed 66) | ElectionSafety 46; LeaderCompleteness 3; liveness failures 3 |
+| `FORGET_VOTED_FOR_ON_RESTART` | votedFor cleared on restart | Election Safety | ElectionSafety | **165** (seed 164) | ElectionSafety 51 |
 | `COMMIT_OLD_TERM_BY_COUNTING` | commits an old-term entry once a majority stores it (Figure 8) | Leader Completeness | not found by random seeds in 3,000; **always caught by the scripted Figure 8 schedule** | 0 of 3,000 random; scripted: 1 run | LeaderCompleteness (scripted) |
 | `NONE` (control) | nothing | - | nothing | - | **0 violations, 0 liveness failures** over the same 3,000 seeds (and over 10,300 further seeds) |
 
@@ -28,3 +28,7 @@ Changes made (the assertion was not weakened; the generator got nastier):
 3. a chaos level **"power loss right after granting a vote"** (0-40%, changed together with the drop/duplicate rates) with a 1-30 ms reboot, because the dangerous moment for a lost vote is exactly when the vote has just left the node.
 
 After these changes `FORGET_VOTED_FOR_ON_RESTART` is found at seed 164 and `ACK_BEFORE_SYNC` at seed 164 as well (earlier: 261), and the correct code still produced zero violations over thousands of seeds, which is what shows the new faults are realistic (a correct Raft must survive them).
+
+
+## Update (Phase 5)
+Phase 5 made `checkQuorum` a coin flip per random seed, which changes the random runs, so the numbers above were re-measured with `BugDetectionTest` (3,000 seeds). The correct code (`NONE`) still shows 0 violations. `ACK_BEFORE_SYNC` is now found after 67 seeds instead of 165, `TRUNCATE_ON_EVERY_APPEND` after 2 instead of 4.
