@@ -49,12 +49,18 @@ public class BrokerApis {
         }
     }
 
+    private final BrokerMetrics metrics;     // may be null (tests)
     private final BrokerConfig config;
     private final ReplicaManager replicas;
     private final Clock clock;
     private final java.util.function.IntSupplier advertisedPort;
 
     public BrokerApis(BrokerConfig config, ReplicaManager replicas, Clock clock, java.util.function.IntSupplier advertisedPort) {
+        this(config, replicas, clock, advertisedPort, null);
+    }
+
+    BrokerApis(BrokerConfig config, ReplicaManager replicas, Clock clock, java.util.function.IntSupplier advertisedPort, BrokerMetrics metrics) {
+        this.metrics = metrics;
         this.config = config;
         this.replicas = replicas;
         this.clock = clock;
@@ -218,7 +224,7 @@ public class BrokerApis {
     public Outcome<FindCoordinatorResponse> handleFindCoordinator(FindCoordinatorRequest request) {
         waitForCoordinatorIfAlone();
         int leader = replicas.coordinatorId();
-        java.net.InetSocketAddress address = leader < 0 ? null : replicas.addresses().get(leader);
+        java.net.InetSocketAddress address = leader < 0 ? null : replicas.advertisedAddresses().get(leader);      // CLIENTS get the advertised address
         if (address == null) {
             return Outcome.error(ErrorCode.COORDINATOR_NOT_AVAILABLE);
         }
@@ -245,6 +251,9 @@ public class BrokerApis {
 
     public Outcome<OffsetCommitResponse> handleOffsetCommit(OffsetCommitRequest r) {
         ErrorCode e = replicas.coordinator().commit(r.groupId(), r.memberId(), r.generation(), r.offsets());
+        if (metrics != null) {
+            metrics.offsetCommit(e);
+        }
         return e == ErrorCode.NONE ? Outcome.ok(new OffsetCommitResponse()) : Outcome.error(e);
     }
 
@@ -272,14 +281,16 @@ public class BrokerApis {
             }
             topics.add(new MetadataResponse.TopicMetadata(topic.name(), partitions));
         }
+        java.net.InetSocketAddress self = replicas.advertisedAddresses().get(config.nodeId());
         return Outcome.ok(new MetadataResponse(
-                new MetadataResponse.BrokerInfo(config.nodeId(), config.host(), advertisedPort.getAsInt()), topics));
+                new MetadataResponse.BrokerInfo(config.nodeId(), self != null ? self.getHostString() : config.host(),
+                        self != null ? self.getPort() : advertisedPort.getAsInt()), topics));
     }
 
     /** Version 2: the whole cluster as seen from here. */
     public Outcome<ClusterMetadataResponse> handleClusterMetadata(MetadataRequest request) {
         List<ClusterMetadataResponse.Broker> brokers = new ArrayList<>();
-        for (var e : replicas.addresses().entrySet()) {
+        for (var e : replicas.advertisedAddresses().entrySet()) {
             brokers.add(new ClusterMetadataResponse.Broker(e.getKey(), e.getValue().getHostString(), e.getValue().getPort()));
         }
         List<ClusterMetadataResponse.Topic> topics = new ArrayList<>();

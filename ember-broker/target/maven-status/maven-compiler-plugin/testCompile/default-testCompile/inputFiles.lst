@@ -1,4 +1,7 @@
+/Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/AdminServerTest.java
+/Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/AdvertisedAddressTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/Await.java
+/Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/BenchCliTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/BrokerApisPartitionsTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/BrokerApisTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/BrokerClusterConfigTest.java
@@ -6,10 +9,12 @@
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/CliTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/ClientIntegrationTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/ClusterChaosTest.java
+/Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/ClusterCliTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/ClusterIntegrationTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/ClusterSmokeTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/DataDirLockTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/EmberGroupConsumerTest.java
+/Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/FaultHooksTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/FetchOverTheWireTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/GroupApisOverTheWireTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/GroupChaosTest.java
@@ -17,6 +22,8 @@
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/GroupMember.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/GroupScenariosTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/HardeningTest.java
+/Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/Http.java
+/Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/JsonWriterTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/LeaderStabilityTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/LogManagerTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/MutableClock.java
@@ -25,8 +32,10 @@
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/PartitionedProducerConsumerTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/PeerTrafficIsolationTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/ProduceMetadataOverTheWireTest.java
+/Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/RaftMetricsTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/RawClient.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/ServerFixture.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/SmokeTest.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/TestCluster.java
+/Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/TestJson.java
 /Users/vinothanandgani/Dev/ember/ember-broker/src/test/java/com/ember/broker/TopicApiOverTheWireTest.java

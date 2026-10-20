@@ -5,6 +5,7 @@ com/ember/broker/PeerMessageHandler.class
 com/ember/broker/BrokerConfig$ClusterMember.class
 com/ember/broker/BrokerServer.class
 com/ember/broker/PeerNetwork$1.class
+com/ember/broker/JsonWriter.class
 com/ember/broker/BrokerConfig.class
 com/ember/broker/LocalBrokerApis.class
 com/ember/broker/PeerNetwork.class
@@ -17,6 +18,7 @@ com/ember/broker/EmberBroker.class
 com/ember/broker/BrokerApis$FetchOutcome.class
 com/ember/broker/ReplicaManager$TopicState.class
 com/ember/broker/Topic.class
+com/ember/broker/PeerNetwork$PeerStatus.class
 com/ember/broker/ReplicaManager$1.class
 com/ember/broker/LocalBrokerApis$FetchOutcome.class
 com/ember/broker/BrokerApis.class
@@ -24,7 +26,10 @@ com/ember/broker/ReplicaManager$RaftSender.class
 com/ember/broker/RequestHandler.class
 com/ember/broker/DataDirLock.class
 com/ember/broker/LogManager$PartitionDir.class
+com/ember/broker/BrokerMetrics.class
+com/ember/broker/AdminServer$Handler.class
 com/ember/broker/BrokerApis$Outcome.class
 com/ember/broker/BrokerApis$1.class
 com/ember/broker/LocalBrokerApis$Outcome.class
+com/ember/broker/AdminServer.class
 com/ember/broker/ReplicaManager.class

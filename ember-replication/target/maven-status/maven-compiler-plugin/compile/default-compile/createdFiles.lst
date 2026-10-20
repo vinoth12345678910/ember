@@ -1,5 +1,6 @@
 com/ember/replication/GroupRuntime$Listener.class
 com/ember/replication/MetadataStateMachine$CreateResult.class
+com/ember/replication/ConfigurableFaults.class
 com/ember/replication/GroupStateMachine$Result.class
 com/ember/replication/GroupRuntime$NotLeaderException.class
 com/ember/replication/GroupRuntime$GroupFailedException.class
@@ -23,7 +24,9 @@ com/ember/replication/GroupCommands$Member.class
 com/ember/replication/GroupStateMachine$GroupData.class
 com/ember/replication/GroupCoordinator$DescribeResult.class
 com/ember/replication/GroupCommands$SetMembership.class
+com/ember/replication/FaultInjector.class
 com/ember/replication/Assignor.class
+com/ember/replication/FaultInjector$1.class
 com/ember/replication/GroupCommands.class
 com/ember/replication/GroupCommands$OffsetCommit.class
 com/ember/replication/GroupLog.class

@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.ember.storage.RetentionTest
 -------------------------------------------------------------------------------
-Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.703 s -- in com.ember.storage.RetentionTest
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.737 s -- in com.ember.storage.RetentionTest

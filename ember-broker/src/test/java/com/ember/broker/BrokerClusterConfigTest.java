@@ -81,4 +81,31 @@ class BrokerClusterConfigTest {
         assertTrue(BrokerConfig.parse("--node-id=5", "--cluster=5@h:9005").singleBroker());
         assertEquals(Path.of("./ember-data"), BrokerConfig.parse().dataDir());
     }
+
+    @Test
+    void theClusterListMayCarryAnAdvertisedAddressAsAThirdPart() {
+        BrokerConfig c = BrokerConfig.parse("--node-id=2", "--cluster=1@ember1:9092/localhost:19092,2@ember2:9092/localhost:19093,3@ember3:9092");
+        assertEquals(3, c.cluster().size());
+        assertEquals(new BrokerConfig.ClusterMember(1, "ember1", 9092, "localhost", 19092), c.cluster().get(0));
+        assertEquals(new BrokerConfig.ClusterMember(2, "ember2", 9092, "localhost", 19093), c.cluster().get(1));
+        assertEquals(new BrokerConfig.ClusterMember(3, "ember3", 9092, "ember3", 9092), c.cluster().get(2), "no third part: advertised = internal");
+        assertEquals("ember2", c.host(), "the broker's own internal address is unchanged");
+        assertEquals(9092, c.port());
+    }
+
+    @Test
+    void advertiseOverridesTheThirdPartOfThisBrokersOwnEntry() {
+        BrokerConfig c = BrokerConfig.parse("--node-id=1", "--cluster=1@ember1:9092/localhost:19092,2@ember2:9092", "--advertise=public.example:5555");
+        assertEquals(new BrokerConfig.ClusterMember(1, "ember1", 9092, "public.example", 5555), c.cluster().get(0));
+        assertEquals(new BrokerConfig.ClusterMember(2, "ember2", 9092, "ember2", 9092), c.cluster().get(1), "only this broker's own entry changes");
+    }
+
+    @Test
+    void badAdvertisedAddressesAreRejectedWithAClearMessage() {
+        for (String bad : new String[]{"1@h:1/nonsense", "1@h:1/:5", "1@h:1/host:"}) {
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> BrokerConfig.parse("--node-id=1", "--cluster=" + bad));
+            assertTrue(e.getMessage().contains("advertised") || e.getMessage().contains("--cluster entry"), e.getMessage());
+        }
+        assertThrows(IllegalArgumentException.class, () -> BrokerConfig.parse("--advertise=nocolon"));
+    }
 }

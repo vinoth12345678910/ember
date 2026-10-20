@@ -17,6 +17,7 @@
         <dependency><groupId>com.ember</groupId><artifactId>ember-raft</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.ember</groupId><artifactId>ember-storage</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.ember</groupId><artifactId>ember-protocol</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>com.ember</groupId><artifactId>ember-metrics</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
     </dependencies>
 </project>

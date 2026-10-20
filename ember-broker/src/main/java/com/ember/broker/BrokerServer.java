@@ -1,6 +1,7 @@
 package com.ember.broker;
 
 import com.ember.protocol.ApiKey;
+import com.ember.metrics.MetricsRegistry;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -41,6 +42,7 @@ public class BrokerServer implements AutoCloseable {
     /** Raft frames carry produce batches, so peers may exceed the client frame limit by this much. */
     private static final int PEER_FRAME_SLACK = 1024 * 1024;
 
+    private final com.ember.replication.FaultInjector faults;
     private final BrokerConfig config;
     private final Clock clock;
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -56,8 +58,18 @@ public class BrokerServer implements AutoCloseable {
     private volatile ReplicaManager replicas;
     private volatile BrokerApis apis;
     private volatile PeerNetwork peers;
+    private volatile AdminServer admin;
+    private final MetricsRegistry registry = new MetricsRegistry();
+    private final BrokerMetrics metrics = new BrokerMetrics(registry, connections::size);
+    private final long startedAtMillis = System.currentTimeMillis();
 
     public BrokerServer(BrokerConfig config, Clock clock) {
+        this(config, clock, com.ember.replication.FaultInjector.NONE);
+    }
+
+    /** TEST HOOK: pass a ConfigurableFaults to inject faults. A real broker always runs with FaultInjector.NONE. */
+    public BrokerServer(BrokerConfig config, Clock clock, com.ember.replication.FaultInjector faults) {
+        this.faults = faults == null ? com.ember.replication.FaultInjector.NONE : faults;
         this.config = config;
         this.clock = clock;
         this.boundPort.set(config.port());
@@ -87,11 +99,15 @@ public class BrokerServer implements AutoCloseable {
                                     .addLast(new IdleStateHandler(config.idleTimeoutMs(), 0, 0, TimeUnit.MILLISECONDS))
                                     .addLast(new FrameDecoder(config.maxFrameBytes()))
                                     .addLast(new PeerMessageHandler(BrokerServer.this::onRaftMessage))   // on the I/O loop: see its comment
-                                    .addLast(handlers, new RequestHandler(() -> apis, BrokerServer.this::onRaftMessage));
+                                    .addLast(handlers, new RequestHandler(() -> apis, BrokerServer.this::onRaftMessage, metrics));
                         }
                     });
             serverChannel = bootstrap.bind(config.port()).sync().channel();
             boundPort.set(((InetSocketAddress) serverChannel.localAddress()).getPort());
+            int adminPort = config.effectiveAdminPort();
+            if (adminPort != 0) {
+                admin = new AdminServer(this, config, adminPort == -2 ? 0 : adminPort);   // alive as soon as the port is bound
+            }
             return boundPort.get();
         } catch (Throwable t) {
             shutdown(true);
@@ -103,6 +119,11 @@ public class BrokerServer implements AutoCloseable {
 
     /** addresses: every broker of the cluster, this one included (nodeId -> address). */
     public void start(Map<Integer, InetSocketAddress> addresses) throws IOException {
+        start(addresses, addresses);
+    }
+
+    /** advertised: the addresses CLIENTS are told (METADATA, FIND_COORDINATOR); the brokers talk to each other on `addresses`. */
+    public void start(Map<Integer, InetSocketAddress> addresses, Map<Integer, InetSocketAddress> advertised) throws IOException {
         if (serverChannel == null) {
             throw new IllegalStateException("bind() first");
         }
@@ -111,13 +132,13 @@ public class BrokerServer implements AutoCloseable {
             if (!cluster.containsKey(config.nodeId())) {
                 throw new IllegalArgumentException("the cluster addresses do not contain this broker (node " + config.nodeId() + ")");
             }
-            PeerNetwork network = new PeerNetwork(config.nodeId(), cluster, config.peerQueueSize());
-            ReplicaManager manager = new ReplicaManager(config, cluster, network);
+            PeerNetwork network = new PeerNetwork(config.nodeId(), cluster, config.peerQueueSize(), registry, faults);
+            ReplicaManager manager = new ReplicaManager(config, cluster, network, registry, faults, advertised);
             this.peers = network;
             this.replicas = manager;
             manager.startMaintenance(clock);
             network.start();
-            this.apis = new BrokerApis(config, manager, clock, boundPort::get);
+            this.apis = new BrokerApis(config, manager, clock, boundPort::get, metrics);
             if (cluster.size() == 1) {
                 manager.awaitMetaLeaderReady(10_000);               // a lone broker elects itself: be ready when start() returns
             }
@@ -131,19 +152,92 @@ public class BrokerServer implements AutoCloseable {
     public int start() throws IOException, InterruptedException {
         int port = bind();
         Map<Integer, InetSocketAddress> cluster = new TreeMap<>();
+        Map<Integer, InetSocketAddress> advertised = new TreeMap<>();
         if (config.cluster().isEmpty()) {
             cluster.put(config.nodeId(), new InetSocketAddress(config.host(), port));
+            advertised.put(config.nodeId(), config.advertiseHost() != null
+                    ? InetSocketAddress.createUnresolved(config.advertiseHost(), config.advertisePort()) : cluster.get(config.nodeId()));
         } else {
             for (BrokerConfig.ClusterMember m : config.cluster()) {
                 cluster.put(m.nodeId(), new InetSocketAddress(m.host(), m.port()));
+                advertised.put(m.nodeId(), InetSocketAddress.createUnresolved(m.advertisedHost(), m.advertisedPort()));
             }
         }
-        start(cluster);
+        start(cluster, advertised);
         return port;
     }
 
     public int port() {
         return boundPort.get();
+    }
+
+    public com.ember.replication.FaultInjector faults() {
+        return faults;
+    }
+
+    /** The admin HTTP port, or -1 when the admin server is disabled. */
+    public int adminPort() {
+        AdminServer a = admin;
+        return a == null ? -1 : a.port();
+    }
+
+    MetricsRegistry registry() {
+        return registry;
+    }
+
+    BrokerMetrics metrics() {
+        return metrics;
+    }
+
+    long uptimeMillis() {
+        return System.currentTimeMillis() - startedAtMillis;
+    }
+
+    java.util.List<PeerNetwork.PeerStatus> peerStatus() {
+        PeerNetwork network = peers;
+        return network == null ? java.util.List.of() : network.status();
+    }
+
+    /**
+     * null when the broker is READY to serve, otherwise why not. Ready = joined the cluster, the META and __groups groups have a
+     * leader, and every local Raft group has applied everything it knows to be committed (a restarted follower learns the commit
+     * index from its first heartbeat, so while it is still replaying its log it is NOT ready).
+     */
+    String notReadyReason() {
+        ReplicaManager manager = replicas;
+        if (manager == null || apis == null) {
+            return "not joined the cluster yet";
+        }
+        String reason = groupReason(manager.metaGroup());
+        if (reason == null) reason = groupReason(manager.groupsGroup());
+        if (reason != null) {
+            return reason;
+        }
+        for (ReplicaManager.TopicState t : manager.topics()) {
+            for (ReplicaManager.PartitionReplica r : t.replicas()) {
+                reason = groupReason(r.group());
+                if (reason != null) return reason;
+            }
+        }
+        return null;
+    }
+
+    private static String groupReason(com.ember.replication.GroupRuntime g) {
+        if (g.hasFailed()) {
+            return "group " + g.name() + " has failed";
+        }
+        if (!g.isLeader() && g.leaderId() < 0) {
+            return "group " + g.name() + " has no known leader";
+        }
+        if (g.commitIndex() < 1) {
+            // every elected group commits at least its leader's no-op, so a group still at 0 has not heard the leader's commit index
+            // yet: its state machine has applied nothing and "applied == committed" would be a false green (found by a flaky test)
+            return "group " + g.name() + " has not learned the commit index yet";
+        }
+        if (g.lastApplied() < g.commitIndex()) {
+            return "group " + g.name() + " is still applying (applied " + g.lastApplied() + " of committed " + g.commitIndex() + ")";
+        }
+        return null;
     }
 
     /** The replicas (and, through them, the data logs). Named logManager() since Phase 2 tests use it. */
@@ -205,6 +299,13 @@ public class BrokerServer implements AutoCloseable {
     }
 
     private void shutdown(boolean graceful) {
+        if (faults instanceof com.ember.replication.ConfigurableFaults f) {
+            f.resume();                                   // a paused broker must be able to stop
+        }
+        if (admin != null) {
+            admin.close();
+            admin = null;
+        }
         if (serverChannel != null) {
             serverChannel.close().awaitUninterruptibly(2, TimeUnit.SECONDS);       // 1. stop accepting
         }

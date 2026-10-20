@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ember.raft.ElectionRulesTest" time="0.012" tests="36" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ember.raft.ElectionRulesTest" time="0.013" tests="36" errors="0" skipped="0" failures="0">
   <properties>
     <property name="raft.seeds" value="300"/>
     <property name="java.specification.version" value="21"/>
@@ -13,7 +13,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="IN"/>
     <property name="sun.boot.library.path" value="/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home/lib"/>
-    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/surefire/surefirebooter-20261019185710473_12.jar /Users/vinothanandgani/Dev/ember/ember-raft/target/surefire 2026-10-19T18-56-31_705-jvmRun1 surefire-20261019185710473_10tmp surefire_1-20261019185710473_11tmp"/>
+    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/surefire/surefirebooter-20261020121950079_16.jar /Users/vinothanandgani/Dev/ember/ember-raft/target/surefire 2026-10-20T12-19-10_352-jvmRun1 surefire-20261020121950079_14tmp surefire_2-20261020121950079_15tmp"/>
     <property name="http.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-raft/target/classes:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
@@ -30,7 +30,7 @@
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="apple.awt.application.name" value="ForkedBooter"/>
-    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/surefire/surefirebooter-20261019185710473_12.jar"/>
+    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-raft/target/surefire/surefirebooter-20261020121950079_16.jar"/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="ftp.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="java.runtime.version" value="21.0.12.1+1-LTS-4"/>
@@ -63,13 +63,13 @@
   <testcase name="R6_evenSizedClustersNeedMoreThanHalf" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R5_aLeaderOrCandidateDoesNotVoteForSomeoneElseInItsOwnTerm" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R4_aCandidateThatTimesOutAgainStartsAnotherTerm" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="R4_aSingleNodeClusterBecomesLeaderImmediately" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
-  <testcase name="R5_theCandidatesLogMustBeAtLeastAsUpToDate" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="R18_aRestartedLeaderIsAFollowerWithAFreshDeadlineAndKeepsItsTermAndVote" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
+  <testcase name="R4_aSingleNodeClusterBecomesLeaderImmediately" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
+  <testcase name="R5_theCandidatesLogMustBeAtLeastAsUpToDate" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
+  <testcase name="R18_aRestartedLeaderIsAFollowerWithAFreshDeadlineAndKeepsItsTermAndVote" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R5_theSameCandidateAskingTwiceGetsTheSameAnswer" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="R7_aCandidateStepsDownOnAnAppendEntriesWithTheSameTerm" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="R8_heartbeatsGoOutExactlyEveryHeartbeatInterval" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
-  <testcase name="R16_aLeaderStepsDownOnAHigherTermRequestVote" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
+  <testcase name="R7_aCandidateStepsDownOnAnAppendEntriesWithTheSameTerm" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
+  <testcase name="R8_heartbeatsGoOutExactlyEveryHeartbeatInterval" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
+  <testcase name="R16_aLeaderStepsDownOnAHigherTermRequestVote" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
   <testcase name="R5_aPersistedVoteSurvivesARestartAndPreventsADoubleVote" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R2_aStaleVoteResponseIsIgnored" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R6_aDuplicatedVoteIsCountedOnce" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
@@ -80,19 +80,19 @@
   <testcase name="R16_nextTimerMsIsCorrectInEveryRole" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R6_votesFromAnEarlierElectionDoNotCarryOver" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R5_aNewTermAllowsANewVote" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="R16_aLeaderNeverStartsAnElectionNoMatterHowLateItIsTicked" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
+  <testcase name="R16_aLeaderNeverStartsAnElectionNoMatterHowLateItIsTicked" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R16_aLeaderStepsDownWhenAnAppendEntriesResponseShowsAHigherTerm" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="R1_aHigherTermInAResponseAlsoMakesUsAFollower" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="injectedBug_forgetVotedForOnRestart_letsANodeVoteTwiceInOneTerm" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
+  <testcase name="R1_aHigherTermInAResponseAlsoMakesUsAFollower" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
+  <testcase name="injectedBug_forgetVotedForOnRestart_letsANodeVoteTwiceInOneTerm" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R1_higherTermInAnAppendEntriesMakesUsAFollowerOfThatTerm" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="R6_deniedVotesDoNotCount" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
+  <testcase name="R6_deniedVotesDoNotCount" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
   <testcase name="R1_termAndVoteAreClearedTogetherInOneWrite" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="R7_aCandidateIgnoresAnAppendEntriesFromAnOlderTerm" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
+  <testcase name="R7_aCandidateIgnoresAnAppendEntriesFromAnOlderTerm" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R4_aTimeoutMakesUsACandidateInANewTermVotingForOurselvesAndAskingEveryoneElse" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
   <testcase name="R6_aMajorityOfVotesMakesTheCandidateLeader" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R2_aStaleAppendEntriesResponseIsIgnored" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R5_theVoteIsDurableBeforeTheResponseIsSent" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
-  <testcase name="R8_theNewLeaderAppendsANoopAndImmediatelyAnnouncesItselfToEveryone" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
+  <testcase name="R8_theNewLeaderAppendsANoopAndImmediatelyAnnouncesItselfToEveryone" classname="com.ember.raft.ElectionRulesTest" time="0.001"/>
   <testcase name="R5_theElectionDeadlineIsResetOnlyWhenTheVoteIsGranted" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
   <testcase name="R16_aLeaderThatStepsDownGetsAnElectionDeadlineAgain" classname="com.ember.raft.ElectionRulesTest" time="0.0"/>
 </testsuite>

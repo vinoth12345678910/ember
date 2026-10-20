@@ -28,6 +28,7 @@
     <dependencies>
         <dependency><groupId>com.ember</groupId><artifactId>ember-replication</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.ember</groupId><artifactId>ember-protocol</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>com.ember</groupId><artifactId>ember-metrics</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.ember</groupId><artifactId>ember-storage</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>io.netty</groupId><artifactId>netty-handler</artifactId></dependency>
         <dependency><groupId>io.netty</groupId><artifactId>netty-codec</artifactId></dependency>

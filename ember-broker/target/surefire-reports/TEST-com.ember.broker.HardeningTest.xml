@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ember.broker.HardeningTest" time="2.913" tests="11" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ember.broker.HardeningTest" time="3.075" tests="11" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
-    <property name="java.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-broker/target/classes:/Users/vinothanandgani/Dev/ember/ember-replication/target/ember-replication-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-raft/target/ember-raft-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-protocol/target/ember-protocol-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-storage/target/ember-storage-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-handler/4.1.115.Final/netty-handler-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-common/4.1.115.Final/netty-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-resolver/4.1.115.Final/netty-resolver-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-buffer/4.1.115.Final/netty-buffer-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport/4.1.115.Final/netty-transport-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport-native-unix-common/4.1.115.Final/netty-transport-native-unix-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-codec/4.1.115.Final/netty-codec-4.1.115.Final.jar:/Users/vinothanandgani/Dev/ember/ember-client/target/ember-client-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
+    <property name="java.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-broker/target/classes:/Users/vinothanandgani/Dev/ember/ember-replication/target/ember-replication-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-raft/target/ember-raft-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-protocol/target/ember-protocol-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-metrics/target/ember-metrics-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-storage/target/ember-storage-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-handler/4.1.115.Final/netty-handler-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-common/4.1.115.Final/netty-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-resolver/4.1.115.Final/netty-resolver-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-buffer/4.1.115.Final/netty-buffer-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport/4.1.115.Final/netty-transport-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport-native-unix-common/4.1.115.Final/netty-transport-native-unix-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-codec/4.1.115.Final/netty-codec-4.1.115.Final.jar:/Users/vinothanandgani/Dev/ember/ember-client/target/ember-client-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
     <property name="java.vm.vendor" value="Oracle Corporation"/>
     <property name="sun.arch.data.model" value="64"/>
     <property name="java.vendor.url" value="https://java.oracle.com/"/>
@@ -13,10 +13,10 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="IN"/>
     <property name="sun.boot.library.path" value="/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home/lib"/>
-    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261019185746144_37.jar /Users/vinothanandgani/Dev/ember/ember-broker/target/surefire 2026-10-19T18-56-31_705-jvmRun1 surefire-20261019185746144_35tmp surefire_5-20261019185746144_36tmp"/>
+    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261020122025570_44.jar /Users/vinothanandgani/Dev/ember/ember-broker/target/surefire 2026-10-20T12-19-10_352-jvmRun1 surefire-20261020122025570_42tmp surefire_6-20261020122025570_43tmp"/>
     <property name="http.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="jdk.debug" value="release"/>
-    <property name="surefire.test.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-broker/target/classes:/Users/vinothanandgani/Dev/ember/ember-replication/target/ember-replication-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-raft/target/ember-raft-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-protocol/target/ember-protocol-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-storage/target/ember-storage-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-handler/4.1.115.Final/netty-handler-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-common/4.1.115.Final/netty-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-resolver/4.1.115.Final/netty-resolver-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-buffer/4.1.115.Final/netty-buffer-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport/4.1.115.Final/netty-transport-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport-native-unix-common/4.1.115.Final/netty-transport-native-unix-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-codec/4.1.115.Final/netty-codec-4.1.115.Final.jar:/Users/vinothanandgani/Dev/ember/ember-client/target/ember-client-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
+    <property name="surefire.test.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-broker/target/classes:/Users/vinothanandgani/Dev/ember/ember-replication/target/ember-replication-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-raft/target/ember-raft-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-protocol/target/ember-protocol-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-metrics/target/ember-metrics-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-storage/target/ember-storage-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-handler/4.1.115.Final/netty-handler-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-common/4.1.115.Final/netty-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-resolver/4.1.115.Final/netty-resolver-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-buffer/4.1.115.Final/netty-buffer-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport/4.1.115.Final/netty-transport-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-transport-native-unix-common/4.1.115.Final/netty-transport-native-unix-common-4.1.115.Final.jar:/Users/vinothanandgani/.m2/repository/io/netty/netty-codec/4.1.115.Final/netty-codec-4.1.115.Final.jar:/Users/vinothanandgani/Dev/ember/ember-client/target/ember-client-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
     <property name="sun.cpu.endian" value="little"/>
     <property name="user.home" value="/Users/vinothanandgani"/>
     <property name="user.language" value="en"/>
@@ -30,7 +30,7 @@
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="apple.awt.application.name" value="ForkedBooter"/>
-    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261019185746144_37.jar"/>
+    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-broker/target/surefire/surefirebooter-20261020122025570_44.jar"/>
     <property name="cluster.seed" value="0"/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="ftp.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
@@ -59,190 +59,190 @@
     <property name="socksNonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="java.class.version" value="65.0"/>
   </properties>
-  <testcase name="aClientThatVanishesDuringALargeFetchDoesNotHurtTheBroker(Path)" classname="com.ember.broker.HardeningTest" time="0.32">
-    <system-err><![CDATA[Oct 19, 2026 6:59:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="aClientThatVanishesDuringALargeFetchDoesNotHurtTheBroker(Path)" classname="com.ember.broker.HardeningTest" time="0.342">
+    <system-err><![CDATA[Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:40 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic t with 1 partition(s)
-Oct 19, 2026 6:59:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:40 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:40 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:47 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="aRequestArrivingInTinyPiecesIsReassembled(Path)" classname="com.ember.broker.HardeningTest" time="0.315">
-    <system-err><![CDATA[Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="aRequestArrivingInTinyPiecesIsReassembled(Path)" classname="com.ember.broker.HardeningTest" time="0.29">
+    <system-err><![CDATA[Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic t with 1 partition(s)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:47 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:47 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="garbageBytesCloseTheConnectionButNotTheBroker(Path)" classname="com.ember.broker.HardeningTest" time="0.217">
-    <system-err><![CDATA[Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="garbageBytesCloseTheConnectionButNotTheBroker(Path)" classname="com.ember.broker.HardeningTest" time="0.204">
+    <system-err><![CDATA[Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.RequestHandler exceptionCaught
-WARNING: bad framing from /127.0.0.1:59311, closing: client frame of 1195725856 bytes exceeds maxFrameBytes=8388608
-Oct 19, 2026 6:59:41 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:48 PM com.ember.broker.RequestHandler exceptionCaught
+WARNING: bad framing from /127.0.0.1:57510, closing: client frame of 1195725856 bytes exceeds maxFrameBytes=8388608
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
+Oct 20, 2026 12:22:48 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="manyConnectionsAtOnce(Path)" classname="com.ember.broker.HardeningTest" time="0.316">
-    <system-err><![CDATA[Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="manyConnectionsAtOnce(Path)" classname="com.ember.broker.HardeningTest" time="0.36">
+    <system-err><![CDATA[Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic many with 1 partition(s)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group many-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group many-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:48 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="aFrameLargerThanMaxFrameBytesClosesTheConnection(Path)" classname="com.ember.broker.HardeningTest" time="0.177">
-    <system-err><![CDATA[Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.RequestHandler exceptionCaught
-WARNING: bad framing from /127.0.0.1:59515, closing: client frame of 5000 bytes exceeds maxFrameBytes=1024
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="aFrameLargerThanMaxFrameBytesClosesTheConnection(Path)" classname="com.ember.broker.HardeningTest" time="0.22">
+    <system-err><![CDATA[Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:41 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:41 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
+Oct 20, 2026 12:22:48 PM com.ember.broker.RequestHandler exceptionCaught
+WARNING: bad framing from /127.0.0.1:57714, closing: client frame of 5000 bytes exceeds maxFrameBytes=1024
+Oct 20, 2026 12:22:48 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="pipelinedRequestsAreAnsweredInOrder(Path)" classname="com.ember.broker.HardeningTest" time="0.28">
-    <system-err><![CDATA[Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="pipelinedRequestsAreAnsweredInOrder(Path)" classname="com.ember.broker.HardeningTest" time="0.293">
+    <system-err><![CDATA[Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic p with 1 partition(s)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group p-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:48 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group p-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:49 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="twoRequestsInOneWriteBothGetAnswers(Path)" classname="com.ember.broker.HardeningTest" time="0.191">
-    <system-err><![CDATA[Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="twoRequestsInOneWriteBothGetAnswers(Path)" classname="com.ember.broker.HardeningTest" time="0.188">
+    <system-err><![CDATA[Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:49 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="anOpenSocketThatNeverSendsAnythingDoesNotBlockOthers(Path)" classname="com.ember.broker.HardeningTest" time="0.205">
-    <system-err><![CDATA[Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="anOpenSocketThatNeverSendsAnythingDoesNotBlockOthers(Path)" classname="com.ember.broker.HardeningTest" time="0.218">
+    <system-err><![CDATA[Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:49 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="negativeLengthAndTooShortFramesCloseTheConnection(Path)" classname="com.ember.broker.HardeningTest" time="0.204">
-    <system-err><![CDATA[Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="negativeLengthAndTooShortFramesCloseTheConnection(Path)" classname="com.ember.broker.HardeningTest" time="0.217">
+    <system-err><![CDATA[Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.RequestHandler exceptionCaught
-WARNING: bad framing from /127.0.0.1:59525, closing: Adjusted frame length exceeds 9437188: 4294967299 - discarded
-Oct 19, 2026 6:59:42 PM com.ember.broker.RequestHandler channelRead0
-WARNING: unreadable request header, closing /127.0.0.1:59526: request header needs 8 bytes, got 3
-Oct 19, 2026 6:59:42 PM com.ember.broker.RequestHandler channelRead0
-WARNING: unreadable request header, closing /127.0.0.1:59527: request header needs 8 bytes, got 0
-Oct 19, 2026 6:59:42 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:49 PM com.ember.broker.RequestHandler exceptionCaught
+WARNING: bad framing from /127.0.0.1:57724, closing: Adjusted frame length exceeds 9437188: 4294967299 - discarded
+Oct 20, 2026 12:22:49 PM com.ember.broker.RequestHandler channelRead0
+WARNING: unreadable request header, closing /127.0.0.1:57725: request header needs 8 bytes, got 3
+Oct 20, 2026 12:22:49 PM com.ember.broker.RequestHandler channelRead0
+WARNING: unreadable request header, closing /127.0.0.1:57726: request header needs 8 bytes, got 0
+Oct 20, 2026 12:22:49 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="idleConnectionsAreClosed(Path)" classname="com.ember.broker.HardeningTest" time="0.388">
-    <system-err><![CDATA[Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="idleConnectionsAreClosed(Path)" classname="com.ember.broker.HardeningTest" time="0.431">
+    <system-err><![CDATA[Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:42 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:43 PM com.ember.broker.RequestHandler userEventTriggered
-INFO: closing idle connection /127.0.0.1:59530
-Oct 19, 2026 6:59:43 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:49 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
+Oct 20, 2026 12:22:49 PM com.ember.broker.RequestHandler userEventTriggered
+INFO: closing idle connection /127.0.0.1:57729
+Oct 20, 2026 12:22:50 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>
-  <testcase name="aFrameOfExactlyMaxFrameBytesIsAccepted(Path)" classname="com.ember.broker.HardeningTest" time="0.292">
-    <system-err><![CDATA[Oct 19, 2026 6:59:43 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:43 PM com.ember.broker.ReplicaManager$1 onRoleChange
-INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:43 PM com.ember.broker.ReplicaManager$1 onRoleChange
+  <testcase name="aFrameOfExactlyMaxFrameBytesIsAccepted(Path)" classname="com.ember.broker.HardeningTest" time="0.306">
+    <system-err><![CDATA[Oct 20, 2026 12:22:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:43 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group __meta-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:43 PM com.ember.broker.ReplicaManager createPartitionGroups
+Oct 20, 2026 12:22:50 PM com.ember.broker.ReplicaManager createPartitionGroups
 INFO: broker 0: created topic t with 1 partition(s)
-Oct 19, 2026 6:59:43 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __groups-0 is now CANDIDATE in term 1 (leader -1)
+Oct 20, 2026 12:22:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
+INFO: broker 0: group __groups-0 is now LEADER in term 1 (leader 0)
+Oct 20, 2026 12:22:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now CANDIDATE in term 1 (leader -1)
-Oct 19, 2026 6:59:43 PM com.ember.broker.ReplicaManager$1 onRoleChange
+Oct 20, 2026 12:22:50 PM com.ember.broker.ReplicaManager$1 onRoleChange
 INFO: broker 0: group t-0 is now LEADER in term 1 (leader 0)
-Oct 19, 2026 6:59:43 PM com.ember.broker.RequestHandler exceptionCaught
-WARNING: bad framing from /127.0.0.1:59533, closing: client frame of 1025 bytes exceeds maxFrameBytes=1024
-Oct 19, 2026 6:59:43 PM com.ember.broker.BrokerServer shutdown
+Oct 20, 2026 12:22:50 PM com.ember.broker.RequestHandler exceptionCaught
+WARNING: bad framing from /127.0.0.1:57732, closing: client frame of 1025 bytes exceeds maxFrameBytes=1024
+Oct 20, 2026 12:22:50 PM com.ember.broker.BrokerServer shutdown
 INFO: broker 0 stopped
 ]]></system-err>
   </testcase>

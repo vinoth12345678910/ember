@@ -1,0 +1,3 @@
+bench: topic=d-75 partitions=3 producers=4 records=1740 valueBytes=100 batch=1 mode=fixed-rate(87 records/s) warmup=174
+measured: 1,566 records after 174 warm-up records = 87 records/s, 0.01 MB/s
+latency per request of up to 1 records (from the INTENDED send time): p50 28.67 ms  p90 36.86 ms  p99 143.36 ms  p99.9 221.18 ms  max 233.59 ms

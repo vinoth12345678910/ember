@@ -12,7 +12,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="IN"/>
     <property name="sun.boot.library.path" value="/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home/lib"/>
-    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-client/target/surefire/surefirebooter-20261019185745146_34.jar /Users/vinothanandgani/Dev/ember/ember-client/target/surefire 2026-10-19T18-56-31_705-jvmRun1 surefire-20261019185745146_32tmp surefire_4-20261019185745146_33tmp"/>
+    <property name="sun.java.command" value="/Users/vinothanandgani/Dev/ember/ember-client/target/surefire/surefirebooter-20261020122024450_39.jar /Users/vinothanandgani/Dev/ember/ember-client/target/surefire 2026-10-20T12-19-10_352-jvmRun1 surefire-20261020122024450_37tmp surefire_5-20261020122024450_38tmp"/>
     <property name="http.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="/Users/vinothanandgani/Dev/ember/ember-client/target/test-classes:/Users/vinothanandgani/Dev/ember/ember-client/target/classes:/Users/vinothanandgani/Dev/ember/ember-protocol/target/ember-protocol-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-storage/target/ember-storage-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/Dev/ember/ember-raft/target/ember-raft-0.1.0-SNAPSHOT.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.3/junit-jupiter-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.3/junit-jupiter-api-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-commons/1.11.3/junit-platform-commons-1.11.3.jar:/Users/vinothanandgani/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.3/junit-jupiter-params-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.3/junit-jupiter-engine-5.11.3.jar:/Users/vinothanandgani/.m2/repository/org/junit/platform/junit-platform-engine/1.11.3/junit-platform-engine-1.11.3.jar:"/>
@@ -29,7 +29,7 @@
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="apple.awt.application.name" value="ForkedBooter"/>
-    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-client/target/surefire/surefirebooter-20261019185745146_34.jar"/>
+    <property name="surefire.real.class.path" value="/Users/vinothanandgani/Dev/ember/ember-client/target/surefire/surefirebooter-20261020122024450_39.jar"/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="ftp.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="java.runtime.version" value="21.0.12.1+1-LTS-4"/>
@@ -57,9 +57,9 @@
     <property name="socksNonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="java.class.version" value="65.0"/>
   </properties>
-  <testcase name="aDeadBootstrapBrokerIsSkipped" classname="com.ember.client.ClusterClientTest" time="0.022"/>
-  <testcase name="aBootstrapListIsRequired" classname="com.ember.client.ClusterClientTest" time="0.001"/>
-  <testcase name="unknownTopicsFailFastInsteadOfUsingTheWholeRetryBudget" classname="com.ember.client.ClusterClientTest" time="0.014"/>
+  <testcase name="aDeadBootstrapBrokerIsSkipped" classname="com.ember.client.ClusterClientTest" time="0.023"/>
+  <testcase name="aBootstrapListIsRequired" classname="com.ember.client.ClusterClientTest" time="0.002"/>
+  <testcase name="unknownTopicsFailFastInsteadOfUsingTheWholeRetryBudget" classname="com.ember.client.ClusterClientTest" time="0.012"/>
   <testcase name="whenNoBrokerAnswersTheClientGivesUpWithAnIoException" classname="com.ember.client.ClusterClientTest" time="0.007"/>
   <testcase name="aFatalErrorIsNotRetried" classname="com.ember.client.ClusterClientTest" time="0.001"/>
   <testcase name="aRetriableErrorRefreshesMetadataAndTheRetrySucceeds" classname="com.ember.client.ClusterClientTest" time="0.003"/>

@@ -1,4 +1,6 @@
+/Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/BenchRunner.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/ClientConfig.java
+/Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/ClusterCli.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/ClusterClient.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/CommitFailedException.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/ConsumedRecord.java
@@ -13,6 +15,9 @@
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/GroupCli.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/GroupConsumerConfig.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/GroupRecord.java
+/Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/LatencyHistogram.java
+/Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/MiniJson.java
+/Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/OpenLoopSchedule.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/PartitionView.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/RecordMetadata.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/main/java/com/ember/client/Router.java

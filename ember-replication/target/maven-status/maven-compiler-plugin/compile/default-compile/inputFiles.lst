@@ -1,5 +1,7 @@
 /Users/vinothanandgani/Dev/ember/ember-replication/src/main/java/com/ember/replication/Assignor.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/main/java/com/ember/replication/Commands.java
+/Users/vinothanandgani/Dev/ember/ember-replication/src/main/java/com/ember/replication/ConfigurableFaults.java
+/Users/vinothanandgani/Dev/ember/ember-replication/src/main/java/com/ember/replication/FaultInjector.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/main/java/com/ember/replication/FileRaftStorage.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/main/java/com/ember/replication/GroupCommands.java
 /Users/vinothanandgani/Dev/ember/ember-replication/src/main/java/com/ember/replication/GroupCoordinator.java

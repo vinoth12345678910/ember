@@ -205,6 +205,15 @@ These are not wire messages between clients and brokers; they are the payloads o
 | 1 | PRODUCE_BATCH | INT8 1, INT64 timestamp (assigned by the LEADER, so every replica stores the same one), INT32 recordCount, records: (INT32 keyLength (-1 = null), key, INT32 valueLength, value) |
 | 2 | CREATE_TOPIC | INT8 2, STRING name, INT32 partitionCount |
 
+## Advertised addresses (Phase 7, no wire change)
+
+The *layouts* of METADATA v0/v1/v2 and FIND_COORDINATOR did not change, but their *meaning* did: the host and port they carry are the broker's **advertised** address, the one a CLIENT must use. Brokers keep talking to each other on the addresses of the `--cluster` list.
+
+* `--cluster=1@ember1:9092/localhost:19092,2@ember2:9092/localhost:19093,...`: the optional part after `/` is the advertised `host:port` of that broker (default: the same as the internal one). Every broker gets the same list.
+* `--advertise=host:port` overrides the advertised address of the broker itself (and sets it for a single broker without `--cluster`).
+* METADATA v1 (`BrokerInfo`) reports this broker's advertised address; METADATA v2 lists the advertised address of every broker; FIND_COORDINATOR reports the advertised address of the coordinator.
+* Only ONE advertised address per broker exists (no multiple listeners). See `docs/phase7/design.md` part 5.
+
 ## Error codes
 
 | Code | Name | When |

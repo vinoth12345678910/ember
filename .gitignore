@@ -1,0 +1,25 @@
+# build output
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# data written by running brokers, demos, benchmarks and soak runs
+ember-data/
+cluster-data/
+demo-data/
+demo6-data/
+bench-data/
+bench6-data/
+soak-*/
+
+# chaos histories and metric samples (re-check one with: java -jar ember-chaos-*-all.jar --check-only=FILE)
+*.jsonl
+samples.csv
+chaos-history-*
+
+# OS
+.DS_Store

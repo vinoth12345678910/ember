@@ -347,6 +347,21 @@ public final class FileRaftStorage implements RaftStorage, AutoCloseable {
         }
     }
 
+    /** Optional metrics: how many real fsyncs happened and how long each took (microseconds). */
+    public void instrument(com.ember.metrics.Counter fsyncs, com.ember.metrics.Histogram fsyncMicros) {
+        this.fsyncCounter = fsyncs;
+        this.fsyncLatency = fsyncMicros;
+    }
+
+    private volatile FaultInjector faults = FaultInjector.NONE;
+    private volatile com.ember.metrics.Counter fsyncCounter;
+    private volatile com.ember.metrics.Histogram fsyncLatency;
+
+    /** TEST HOOK: see FaultInjector. */
+    public void setFaultInjector(FaultInjector faults) {
+        this.faults = faults == null ? FaultInjector.NONE : faults;
+    }
+
     @Override
     public void sync() {
         if (!dirty) {
@@ -354,7 +369,17 @@ public final class FileRaftStorage implements RaftStorage, AutoCloseable {
         }
         try {
             if (fsync) {
+                long start = System.nanoTime();
+                FaultInjector injector = faults;
+                if (injector.active() && injector.fsyncDelayNanos() > 0) {      // TEST HOOK (off by default): a slow disk
+                    java.util.concurrent.locks.LockSupport.parkNanos(injector.fsyncDelayNanos());
+                }
                 log.force(false);
+                com.ember.metrics.Counter counter = fsyncCounter;
+                if (counter != null) {
+                    counter.inc();
+                    fsyncLatency.record((System.nanoTime() - start) / 1_000);
+                }
             }
             dirty = false;
         } catch (IOException e) {

@@ -60,7 +60,7 @@ public final class GroupRuntime implements AutoCloseable {
         }
     }
 
-    private record Pending(long term, CompletableFuture<Object> future) {
+    private record Pending(long term, CompletableFuture<Object> future, long startNanos) {
     }
 
     private record Applied(long term, Object result) {
@@ -82,6 +82,9 @@ public final class GroupRuntime implements AutoCloseable {
     private volatile Thread owner;
     private volatile boolean closed;
     private volatile boolean failed;
+    private volatile FaultInjector faults = FaultInjector.NONE;
+    private volatile com.ember.metrics.Histogram applyLatency;   // optional: propose -> applied on this leader, microseconds
+    private volatile int pendingSize;                             // mirror of pending.size() for readers on other threads
     private volatile boolean leaderReady;        // leader AND has applied an entry of its own term (its no-op)
 
     // touched only by the mailbox thread
@@ -139,6 +142,14 @@ public final class GroupRuntime implements AutoCloseable {
     }
 
     private void drain() {
+        FaultInjector injector = faults;
+        if (injector.active()) {                               // TEST HOOK (off by default): a paused broker's workers freeze here
+            try {
+                injector.awaitNotPaused();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
         owner = Thread.currentThread();
         try {
             int budget = 512;                                  // be fair to other groups sharing this worker
@@ -265,7 +276,8 @@ public final class GroupRuntime implements AutoCloseable {
                 complete(future, result.term(), already);
                 return;
             }
-            pending.put(result.index(), new Pending(result.term(), future));
+            pending.put(result.index(), new Pending(result.term(), future, System.nanoTime()));
+            pendingSize = pending.size();
             if (timeoutMs > 0) {
                 long index = result.index();
                 try {
@@ -273,6 +285,7 @@ public final class GroupRuntime implements AutoCloseable {
                         Pending p = pending.get(index);
                         if (p != null && p.future() == future) {
                             pending.remove(index);
+                            pendingSize = pending.size();
                             future.completeExceptionally(new ProposeTimeoutException());
                         }
                     }), timeoutMs, TimeUnit.MILLISECONDS);
@@ -282,6 +295,21 @@ public final class GroupRuntime implements AutoCloseable {
             }
         });
         return future;
+    }
+
+    /** TEST HOOK: see FaultInjector. */
+    public void setFaultInjector(FaultInjector faults) {
+        this.faults = faults == null ? FaultInjector.NONE : faults;
+    }
+
+    /** Optional: records how long each proposal took from propose() to being applied here (microseconds). */
+    public void setApplyLatency(com.ember.metrics.Histogram histogram) {
+        this.applyLatency = histogram;
+    }
+
+    /** Proposals waiting for their commit (read-only, for metrics). */
+    public int pendingCount() {
+        return pendingSize;
     }
 
     public void addListener(RaftListener listener) {
@@ -360,6 +388,7 @@ public final class GroupRuntime implements AutoCloseable {
             p.future().completeExceptionally(reason);
         }
         pending.clear();
+        pendingSize = 0;
     }
 
     private final class Listener implements RaftListener {
@@ -376,6 +405,13 @@ public final class GroupRuntime implements AutoCloseable {
         }
 
         @Override
+        public void onCheckQuorumStepDown(int nodeId, long term) {
+            for (RaftListener l : listeners) {
+                l.onCheckQuorumStepDown(nodeId, term);
+            }
+        }
+
+        @Override
         public void onCommitted(int nodeId, long index, LogEntry entry) {
             assertOnGroupThread();
             Object result = stateMachine.apply(index, entry);      // an exception here fails the whole group (see runSafely)
@@ -388,6 +424,11 @@ public final class GroupRuntime implements AutoCloseable {
             }
             Pending p = pending.remove(index);
             if (p != null) {
+                pendingSize = pending.size();
+                com.ember.metrics.Histogram latency = applyLatency;
+                if (latency != null) {
+                    latency.record((System.nanoTime() - p.startNanos()) / 1_000);
+                }
                 complete(p.future(), p.term(), applied);
             }
             for (RaftListener l : listeners) {

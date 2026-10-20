@@ -37,3 +37,6 @@ Analogy: the seating chart (generation, who has which table) is written in ink a
 
 ## How it is tested
 `GroupCoordinatorTest` with a manual clock and a fake `GroupLog` that applies commands to a real `GroupStateMachine`: first join; second member triggers a new generation and a changed assignment; idempotent rejoin does not bump the generation; heartbeat with an old generation; session expiry removes only the silent member; two members expiring together produce ONE command; leave; concurrent joins that lose the compare-and-set converge; a new leader gives a full grace period; invalid session timeouts rejected; commit fencing; not-leader and not-ready answers.
+
+## Update (Phase 7)
+The tick also calls `refreshAssignment`: if the assignment derived from the CURRENT topic list differs from the installed one (typically because a topic reached this broker after the members joined), a new generation is proposed with the same members. See `docs/phase7/design.md` part 7. `commitSync()` also now returns a boolean (true only if a commit was sent), and `poll()` no longer drops records already fetched when a later partition's fetch fails.

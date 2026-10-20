@@ -345,4 +345,44 @@ class GroupCoordinatorTest {
         join("", "c", 100, "orders");
         assertEquals(50, coordinator.tickIntervalMs());
     }
+
+    @Test
+    void aTopicThatAppearsAfterTheJoinGetsAssignedByTheNextTick() {
+        GroupCoordinator.JoinResult a = join("", "a", 10_000, "later");
+        GroupCoordinator.JoinResult b = join("", "b", 10_000, "later");
+        assertEquals(List.of(), a.assignment());
+        assertEquals(2, state.group("g").generation());
+        int proposals = log.proposals.size();
+
+        coordinator.expireSessions();
+        assertEquals(proposals, log.proposals.size(), "nothing changed, so the tick proposes nothing");
+
+        topicCounts.put("later", 4);                                             // the topic list reached this broker
+        coordinator.expireSessions();
+        GroupStateMachine.GroupData g = state.group("g");
+        assertEquals(3, g.generation(), "one new generation, members unchanged");
+        assertEquals(Set.of(a.memberId(), b.memberId()), g.members().keySet());
+        assertEquals(2, g.members().get(a.memberId()).assigned().size());
+        assertEquals(2, g.members().get(b.memberId()).assigned().size());
+        assertEquals(ErrorCode.REBALANCE_IN_PROGRESS, coordinator.heartbeat("g", a.memberId(), 2), "members learn about it on their next heartbeat");
+
+        GroupCoordinator.JoinResult rejoined = join(a.memberId(), "a", 10_000, "later");
+        assertEquals(3, rejoined.generation());
+        assertEquals(2, rejoined.assignment().size());
+
+        int after = log.proposals.size();
+        coordinator.expireSessions();
+        coordinator.expireSessions();
+        assertEquals(after, log.proposals.size(), "once installed, the tick is quiet again: no flapping");
+    }
+
+    @Test
+    void theTickLeavesAGroupWithoutMembersAlone() {
+        join("", "a", 10_000, "orders");
+        coordinator.leave("g", state.group("g").members().keySet().iterator().next());
+        int proposals = log.proposals.size();
+        topicCounts.put("orders", 8);
+        coordinator.expireSessions();
+        assertEquals(proposals, log.proposals.size());
+    }
 }
