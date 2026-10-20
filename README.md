@@ -1,48 +1,197 @@
-# Ember
+<h1 align="center">Ember</h1>
+<p align="center"><b>A Kafka-style distributed message broker, built from scratch in plain Java 21.</b><br>
+Raft-replicated partitions · consumer groups · observability · chaos-verified</p>
 
-**A Kafka-style message broker, written from scratch in plain Java 21, to learn how replicated logs really work.**
-Topics are split into partitions. Every partition is replicated on three brokers and kept consistent by **Raft**, so a message that Ember acknowledged survives the loss of any one broker, including the leader. Consumers share work in **consumer groups** with committed offsets that are replicated too. The cluster can be watched (metrics, health, status), attacked (a chaos tool with an independent history checker), and started with one `docker compose up`.
+<p align="center">
+<img alt="Java 21" src="https://img.shields.io/badge/Java-21-orange">
+<img alt="Build" src="https://img.shields.io/badge/build-Maven-blue">
+<img alt="Tests" src="https://img.shields.io/badge/tests-747%20passing-brightgreen">
+<img alt="Dependencies" src="https://img.shields.io/badge/dependencies-Netty%20only-lightgrey">
+<img alt="License" src="https://img.shields.io/badge/license-MIT-green">
+</p>
 
-Only Netty and the Maven shade plugin are used as dependencies: the storage engine, the wire protocol, Raft, the metrics library, the JSON handling and the chaos checker are all in this repository.
+Topics are split into partitions. Every partition is replicated on three brokers and kept consistent by **Raft**, so a message Ember acknowledged survives the loss of any one broker, including the leader. Consumers share work in **consumer groups** with replicated offsets. The cluster can be watched (metrics, health, status), attacked (a chaos tool with an independent history checker) and started with one `docker compose up`.
 
-**Tests:** 747 tests, 0 failures (metrics 15, storage 55, raft 182, protocol 97, replication 92, client 39, broker 215, chaos 52), default run about 5.5 minutes; the `cluster-long` profile adds three 120 s chaos runs (8 chaos run tests, 7.5 minutes), all green.
+The storage engine, wire protocol, Raft, metrics library, JSON handling and chaos checker are all written in this repository. The only dependencies are Netty and the Maven shade plugin.
+
+**Tests:** 747 tests, 0 failures (metrics 15, storage 55, raft 182, protocol 97, replication 92, client 39, broker 215, chaos 52), about 5.5 minutes; the `cluster-long` profile adds three 120 s chaos runs.
+
+## Contents
+[Architecture](#architecture) · [Design concepts](#design-concepts) · [Features](#features) · [Quickstart](#quickstart-docker) · [Guarantees](#guarantees-and-non-guarantees) · [Performance](#measured-performance) · [Testing](#how-i-tested-it) · [Failure matrix](#failure-matrix-summary) · [Structure](#project-structure) · [Build and run](#build-and-run) · [Limitations](#known-limitations)
 
 ## Architecture
 
-```
-   producer / consumer / CLI                    (client library: finds leaders, retries, consumer groups)
-            |   binary protocol over TCP (PRODUCE, FETCH, METADATA, CREATE_TOPIC, group APIs ...)
-            v
- +----------------------------------------------------------------------------------------------+
- |  broker 1                         broker 2                         broker 3                  |
- |  (Netty server, admin HTTP)       (the same)                       (the same)                |
- |                                                                                              |
- |  one Raft group per partition, EVERY broker is a voter in EVERY group:                       |
- |     orders-0 [L]----------------- orders-0 [F] ------------------ orders-0 [F]              |
- |     orders-1 [F]----------------- orders-1 [L] ------------------ orders-1 [F]              |
- |  two special groups:                                                                         |
- |     __meta   : the list of topics (its leader is the "controller")                           |
- |     __groups : consumer groups, members, committed offsets (its leader is the "coordinator") |
- |                                                                                              |
- |  per partition replica, TWO logs:                                                            |
- |     Raft log  (fsync, the truth)  --apply, once committed-->  data log (what consumers read) |
- +----------------------------------------------------------------------------------------------+
-        ^ broker-to-broker traffic is only RAFT_MESSAGE frames (one connection per peer)
+```mermaid
+flowchart TB
+    C["Clients: producer, consumer, CLI<br/>(find leaders, retry, consumer groups)"]
+    subgraph Cluster["3-broker cluster (every broker is a voter in every Raft group)"]
+        direction LR
+        subgraph B1["Broker 1"]
+            direction TB
+            N1["Netty server + admin HTTP"]
+            R1["Raft groups: orders-0 LEADER, orders-1 follower, __meta, __groups"]
+            L1[("Raft log (fsync)<br/>+ data log")]
+            N1 --> R1 --> L1
+        end
+        subgraph B2["Broker 2"]
+            direction TB
+            N2["Netty server + admin HTTP"]
+            R2["Raft groups: orders-0 follower, orders-1 LEADER, __meta, __groups"]
+            L2[("Raft log (fsync)<br/>+ data log")]
+            N2 --> R2 --> L2
+        end
+        subgraph B3["Broker 3"]
+            direction TB
+            N3["Netty server + admin HTTP"]
+            R3["Raft groups: orders-0 follower, orders-1 follower, __meta, __groups"]
+            L3[("Raft log (fsync)<br/>+ data log")]
+            N3 --> R3 --> L3
+        end
+    end
+    C -- "binary protocol over TCP" --> N1
+    C -- "binary protocol over TCP" --> N2
+    C -- "binary protocol over TCP" --> N3
+    R1 <-- "RAFT_MESSAGE frames" --> R2
+    R2 <-- "RAFT_MESSAGE frames" --> R3
+    R1 <-- "RAFT_MESSAGE frames" --> R3
+    P["Prometheus + Grafana"] -. "scrape /metrics" .-> N1
 ```
 
-A produce is acknowledged only after the entry is committed on a **majority** of Raft logs and applied on the leader. Reading is zero-copy from the data log, served by the partition's leader only. Details and a failure matrix: [`docs/phase5/design.md`](docs/phase5/design.md), [`docs/phase6/design.md`](docs/phase6/design.md), [`docs/phase7/design.md`](docs/phase7/design.md).
+* **One Raft group per partition**, plus two special groups: `__meta` (the topic list; its leader is the *controller*) and `__groups` (consumer groups, members, committed offsets; its leader is the *coordinator*).
+* **Two logs per replica:** the Raft log (fsynced, the source of truth) and the data log consumers read. The data log is rebuilt from the Raft log by idempotent apply, so a torn tail is repaired on start.
+* A produce is acknowledged only after the entry is **committed on a majority** of Raft logs and applied on the leader. Fetches are zero-copy from the data log and served by the partition leader only.
+
+### Module dependencies
+
+```mermaid
+flowchart LR
+    storage["ember-storage<br/>(no deps)"]
+    raft["ember-raft<br/>(pure, no deps)"]
+    metrics["ember-metrics<br/>(no deps)"]
+    protocol["ember-protocol"]
+    replication["ember-replication"]
+    broker["ember-broker<br/>(Netty)"]
+    client["ember-client"]
+    chaos["ember-chaos"]
+    protocol --> storage & raft
+    replication --> raft & storage & protocol & metrics
+    broker --> replication & protocol & storage & metrics
+    client --> protocol
+    chaos --> client & broker & replication & raft & storage & protocol
+```
+
+Boundaries are enforced on purpose: the Raft core stays pure and deterministic so a simulator can attack it; the client never imports the broker; only the broker module touches Netty.
+
+## Design concepts
+
+### 1. The write path (a produce request)
+
+```mermaid
+sequenceDiagram
+    participant P as Producer
+    participant L as Leader (orders-0)
+    participant F1 as Follower 2
+    participant F2 as Follower 3
+    P->>L: PRODUCE (batch)
+    L->>L: append to Raft log + fsync
+    par replicate
+        L->>F1: AppendEntries
+        L->>F2: AppendEntries
+    end
+    F1->>F1: append + fsync
+    F1-->>L: ack
+    Note over L: majority (2 of 3) has it: COMMITTED
+    L->>L: apply to data log
+    L-->>P: offset (acknowledged)
+    F2-->>L: ack (late, not needed)
+```
+
+The leader fsyncs before sending and every follower fsyncs before answering. This is why a single acknowledged produce costs about 34 ms in the measurements below, and why the fsync is the dominant cost.
+
+### 2. Leader failover
+
+```mermaid
+sequenceDiagram
+    participant P as Producer
+    participant L as Old leader (broker 1)
+    participant B2 as Broker 2
+    participant B3 as Broker 3
+    P->>L: PRODUCE
+    Note over L: kill -9
+    P--xL: connection lost, request retried later
+    B2->>B2: election timeout (300-600 ms), becomes candidate, term+1
+    B2->>B3: RequestVote
+    B3-->>B2: vote granted (log is at least as up to date)
+    Note over B2: new LEADER
+    P->>B2: METADATA, then PRODUCE (retry)
+    B2-->>P: offset
+```
+
+Only a candidate whose log contains every committed entry can win, so no acknowledged record is lost. A record that was in flight may be delivered twice by the client retry (at-least-once). Measured: median **770 ms** from `kill -9` to the first successful produce over 20 kills.
+
+### 3. Consumer groups, generations and fencing
+
+```mermaid
+stateDiagram-v2
+    [*] --> Joining: JOIN_GROUP
+    Joining --> Stable: coordinator installs generation N<br/>(assignment computed by the leader)
+    Stable --> Stable: heartbeat / commit offset (with generation N)
+    Stable --> Rebalancing: member joins, leaves or session times out
+    Rebalancing --> Stable: generation N+1 installed
+    Stable --> Fenced: commit with stale generation
+    Fenced --> Joining: rejoin
+```
+
+The coordinator is the leader of the `__groups` Raft group. Every membership change creates a new **generation**, and offset commits carry their generation. A paused "zombie" consumer waking up with an old generation is rejected, so it cannot overwrite its successor's offsets. Offsets are committed through Raft, so they survive the loss of a minority of brokers and a full restart. Rebalancing is eager; delivery is at-least-once (process, then commit).
+
+### 4. How the system is verified: history checker
+
+```mermaid
+flowchart LR
+    W["Workload:<br/>producers, readers,<br/>group consumers"] --> H[("History:<br/>invoke / complete events<br/>OK, FAIL or INFO (unknown)")]
+    N["Nemesis (seeded):<br/>crash, freeze, isolate,<br/>cut link, slow fsync,<br/>drop / delay messages"] --> Cluster["Real cluster<br/>(in-process, processes or Docker)"]
+    W --> Cluster
+    Cluster --> Col["Collector:<br/>replica digests, group and meta state"]
+    H --> Ch{{"Checker P1-P9"}}
+    Col --> Ch
+    Ch --> V["Violations: 0 expected"]
+    M["Mutation tests:<br/>inject one bug into a good history"] -. "checker must catch each" .-> Ch
+```
+
+The checker does not ask the broker whether it was correct. It reads only what clients were told and what they read, and checks nine properties: no lost acknowledged write, no divergence, no phantoms, unique and increasing offsets, per-key order, reads never shrink, group delivery, commit fencing, and replica agreement. The checker itself is mutation-tested: 13 injected bugs, all caught with the expected error code. What it cannot prove is listed in [`docs/phase7/design.md`](docs/phase7/design.md).
+
+### 5. Coordinated omission
+
+A closed-loop benchmark waits for each reply, so during a stall it simply stops sending and records one slow request, hiding the requests that *would* have arrived. Ember's `bench --rate=N` sends on a fixed schedule and measures latency from the **intended** send time. That exposed a latency knee that a closed loop cannot show: p99 of 49 ms at 50% of max load and 143 ms at 75%.
+
+### 6. Advertised addresses
+
+A broker has two names: `ember2:9092` inside Docker, `localhost:19093` from your laptop. METADATA and FIND_COORDINATOR return the **advertised** address a client must use, while brokers keep talking to each other on the internal addresses (`--cluster=1@ember1:9092/localhost:19092,...`).
+
+### Design decisions at a glance
+
+| Decision | Why | Cost |
+|---|---|---|
+| Raft per partition, every broker a voter | Simple, strongly consistent, no ISR logic | Replication factor = cluster size; many groups mean many fsyncs |
+| Two logs per replica | Raft log stays the truth; the data log is a cheap, zero-copy read path | Every record is written twice |
+| Coordinator = leader of `__groups` | Group state replicated for free | One coordinator for all groups |
+| Pure Raft core, no metrics inside | Deterministic simulation; listener turns events into metrics | Extra listener plumbing |
+| Own metrics library | Rule: no libraries; learn what a histogram is | Fewer features |
+| Fault hooks off by default, zero cost when off | Safe production path | Docker driver supports fewer faults than in-process |
+
+Full reasoning for every step is in `docs/phase1..7/` (each step note covers what, why, rejected alternatives, what goes wrong, tradeoffs and tests).
 
 ## Features
 
 * **Storage engine** (Phase 1): segmented log, sparse index, CRC per record, crash recovery of torn tails, retention, fsync policy.
-* **Network and protocol** (Phase 2-3): binary request/response protocol, Netty broker with zero-copy fetch, partitions with murmur2 key routing, a blocking client library and CLI.
-* **Raft, proven by simulation** (Phase 4): a pure, deterministic Raft core with a simulator that attacks it with thousands of failure schedules and checks all five Raft safety properties after every event; five injected classic bugs are all caught.
-* **Replicated partitions** (Phase 5): per-partition Raft groups, leader failover without losing an acknowledged record, a restarted broker catches up by itself, CheckQuorum, idempotent apply of the Raft log into the data log.
-* **Consumer groups** (Phase 6): generations and fencing (a paused "zombie" consumer cannot overwrite its successor's offsets), eager rebalancing, session timeouts, offsets committed through Raft, at-least-once delivery.
-* **Observability** (Phase 7): own metrics library with Prometheus text output, admin HTTP server (`/metrics`, `/health/live`, `/health/ready`, `/status`), structured log prefixes, a `cluster status` command.
-* **Chaos verification** (Phase 7): a recorder of client histories, a checker for nine properties (no lost acknowledged write, no divergence, no phantoms, unique offsets, per-key order, reads never shrink, group delivery, commits and fencing, replica agreement) that is itself mutation-tested, and a nemesis that crashes, freezes, isolates, slows and drops.
-* **Benchmark tooling** (Phase 7): percentiles, warm-up, CSV, and a fixed-rate mode that avoids *coordinated omission*.
-* **Docker** (Phase 7): a 3-broker `docker compose` cluster, optional Prometheus + Grafana with a provisioned dashboard.
+* **Network and protocol** (Phase 2-3): binary request/response protocol, Netty broker with zero-copy fetch, murmur2 key routing, blocking client library and CLI.
+* **Raft, proven by simulation** (Phase 4): deterministic Raft core with a simulator that attacks it with thousands of failure schedules and checks Raft's safety properties after every event; five injected classic bugs are all caught.
+* **Replicated partitions** (Phase 5): per-partition Raft groups, leader failover without losing an acknowledged record, automatic catch-up, CheckQuorum, idempotent apply.
+* **Consumer groups** (Phase 6): generations and fencing, eager rebalancing, session timeouts, offsets committed through Raft.
+* **Observability** (Phase 7): own metrics library with Prometheus output, admin HTTP server (`/metrics`, `/health/live`, `/health/ready`, `/status`), Grafana dashboard.
+* **Chaos verification** (Phase 7): history recorder, nine-property checker, nemesis, 5-minute external run against Docker (102,840 acknowledged writes, 18 faults, 0 violations) and 15-minute soak runs.
+* **Benchmark tooling** (Phase 7): percentiles, warm-up, CSV, fixed-rate mode.
+* **Docker** (Phase 7): 3-broker `docker compose` cluster, optional Prometheus and Grafana.
 
 ## Quickstart (Docker)
 
