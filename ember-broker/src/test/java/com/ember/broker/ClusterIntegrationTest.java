@@ -36,6 +36,16 @@ class ClusterIntegrationTest {
         for (int p = 0; p < partitions; p++) c.awaitLeader(topic, p);
     }
 
+    /** Like createTopic, but through the brokers' INTERNAL addresses (for clusters whose advertised addresses are unreachable). */
+    static void createTopic3(TestCluster c, String topic, int partitions) throws Exception {
+        int controller = c.awaitController();
+        try (EmberClient client = new EmberClient("localhost", c.port(controller))) {
+            client.createTopic(topic, partitions);
+        }
+        c.awaitTopicEverywhere(topic, partitions);
+        for (int p = 0; p < partitions; p++) c.awaitLeader(topic, p);
+    }
+
     static Map<Integer, List<LogRecord>> readAll(TestCluster c, String topic) throws Exception {
         Map<Integer, List<LogRecord>> out = new TreeMap<>();
         try (EmberConsumer consumer = new EmberConsumer(cfg(c))) {

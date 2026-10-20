@@ -23,14 +23,26 @@ final class TestCluster implements AutoCloseable {
     final String[] extraFlags;
     final Clock clock;
     final BrokerServer[] servers;
+    /** One injector per broker (nothing injected until a test configures it); the same object survives a restart. */
+    final com.ember.replication.ConfigurableFaults[] faults;
     final int[] ports;
     final Map<Integer, InetSocketAddress> addresses = new TreeMap<>();
+    final Map<Integer, InetSocketAddress> advertised = new TreeMap<>();
 
     TestCluster(Path base, int n, boolean fsync, String... extraFlags) throws Exception {
         this(base, n, fsync, Clock.systemUTC(), extraFlags);
     }
 
     TestCluster(Path base, int n, boolean fsync, Clock clock, String... extraFlags) throws Exception {
+        this(base, n, fsync, clock, null, extraFlags);
+    }
+
+    /** advertisedOverrides: nodeId -> the address CLIENTS are told for that broker (the others keep their real address). */
+    TestCluster(Path base, int n, boolean fsync, Map<Integer, InetSocketAddress> advertisedOverrides, String... extraFlags) throws Exception {
+        this(base, n, fsync, Clock.systemUTC(), advertisedOverrides, extraFlags);
+    }
+
+    private TestCluster(Path base, int n, boolean fsync, Clock clock, Map<Integer, InetSocketAddress> advertisedOverrides, String... extraFlags) throws Exception {
         this.base = base;
         this.n = n;
         this.clock = clock;
@@ -38,14 +50,18 @@ final class TestCluster implements AutoCloseable {
         if (!fsync) flags.add("--unsafe-no-raft-fsync");
         this.extraFlags = flags.toArray(new String[0]);
         this.servers = new BrokerServer[n + 1];
+        this.faults = new com.ember.replication.ConfigurableFaults[n + 1];
+        for (int i = 1; i <= n; i++) faults[i] = new com.ember.replication.ConfigurableFaults();
         this.ports = new int[n + 1];
         for (int i = 1; i <= n; i++) {                       // phase 1: everybody binds, so every port is known
-            servers[i] = new BrokerServer(config(i), clock);
+            servers[i] = new BrokerServer(config(i), clock, faults[i]);
             ports[i] = servers[i].bind();
             addresses.put(i, new InetSocketAddress("localhost", ports[i]));
         }
+        this.advertised.putAll(addresses);
+        if (advertisedOverrides != null) this.advertised.putAll(advertisedOverrides);
         for (int i = 1; i <= n; i++) {                       // phase 2: everybody joins
-            servers[i].start(addresses);
+            servers[i].start(addresses, advertised);
         }
     }
 
@@ -54,7 +70,7 @@ final class TestCluster implements AutoCloseable {
                 "--node-id=" + i, "--port=" + ports[i], "--data-dir=" + base.resolve("broker-" + i),
                 "--segment-bytes=4096", "--index-interval-bytes=256", "--maintenance-interval-ms=3600000",
                 "--raft-election-min-ms=150", "--raft-election-max-ms=300", "--raft-heartbeat-ms=30",
-                "--handler-threads=16", "--produce-timeout-ms=5000", "--data-flush=never", "--group-min-session-ms=100"));
+                "--handler-threads=16", "--produce-timeout-ms=5000", "--data-flush=never", "--group-min-session-ms=100", "--admin-port=ephemeral"));
         flags.addAll(List.of(extraFlags));
         return BrokerConfig.parse(flags.toArray(new String[0]));
     }
@@ -82,13 +98,18 @@ final class TestCluster implements AutoCloseable {
     /** Starts a stopped/crashed broker again on the same data directory and the same port. */
     void restart(int i) throws Exception {
         if (servers[i] != null) return;
-        BrokerServer s = new BrokerServer(config(i), clock);
+        BrokerServer s = new BrokerServer(config(i), clock, faults[i]);
         int port = s.bind();
         if (port != ports[i]) {
             throw new IllegalStateException("broker " + i + " came back on port " + port + " instead of " + ports[i]);
         }
-        s.start(addresses);
+        s.start(addresses, advertised);
         servers[i] = s;
+    }
+
+    /** The admin HTTP port of a broker that is up. */
+    int adminPort(int i) {
+        return servers[i].adminPort();
     }
 
     int port(int i) {

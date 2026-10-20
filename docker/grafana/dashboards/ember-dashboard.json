@@ -1,0 +1,611 @@
+{
+ "uid": "ember-overview",
+ "title": "Ember cluster",
+ "tags": [
+  "ember"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 39,
+ "version": 1,
+ "refresh": "5s",
+ "time": {
+  "from": "now-15m",
+  "to": "now"
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "timeseries",
+   "title": "Produce rate (records/s)",
+   "description": "Records acknowledged per second, per broker (a broker only counts the produces it answered as leader).",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "sum by (node) (rate(ember_produce_records_total[30s]))",
+     "legendFormat": "node {{node}}"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "type": "timeseries",
+   "title": "Produce p99 latency",
+   "description": "From request received to response written: includes the Raft commit.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "histogram_quantile(0.99, sum by (le, node) (rate(ember_produce_latency_seconds_bucket[1m])))",
+     "legendFormat": "p99 node {{node}}"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "histogram_quantile(0.50, sum by (le, node) (rate(ember_produce_latency_seconds_bucket[1m])))",
+     "legendFormat": "p50 node {{node}}"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "type": "timeseries",
+   "title": "Raft role (0 follower, 1 candidate, 2 leader)",
+   "description": "One line per group and broker. The leader of __meta-0 is the controller; the leader of __groups-0 is the consumer-group coordinator.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 8,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "ember_raft_role{group=~\"__meta-0|__groups-0|chaos-.*|orders-.*|t-.*\"}",
+     "legendFormat": "{{group}} on node {{node}}"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "type": "timeseries",
+   "title": "Leader changes (last 5 minutes)",
+   "description": "How often leadership moved. Divided by 3 because every broker counts each change once.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 8,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "sum by (group) (increase(ember_raft_leader_changes_total[5m])) / 3",
+     "legendFormat": "{{group}}"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "type": "timeseries",
+   "title": "Commit index per group (top 6)",
+   "description": "How much each Raft group has committed. A broker whose number lags the others is behind.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 16,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "topk(6, ember_raft_commit_index)",
+     "legendFormat": "{{group}} node {{node}}"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "type": "timeseries",
+   "title": "Peer queue depth and drops",
+   "description": "Raft messages waiting to be sent, and messages dropped (full queue, cut link or broken connection).",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 16,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "ember_peer_queue_depth",
+     "legendFormat": "queue to peer {{peer}} from node {{node}}"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "rate(ember_peer_messages_dropped_total[1m])",
+     "legendFormat": "drops/s to peer {{peer}} from node {{node}}"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "type": "timeseries",
+   "title": "Log end offsets (data logs)",
+   "description": "The committed end of each partition on each broker. Replicas of one partition should converge to the same number.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 24,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "ember_log_end_offset",
+     "legendFormat": "{{topic}}-{{partition}} node {{node}}"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "type": "timeseries",
+   "title": "Consumer group lag",
+   "description": "Log end minus committed offset, reported by the coordinator leader only. If it only grows, the group is not keeping up or is stuck.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 24,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "ember_group_lag",
+     "legendFormat": "{{group}} {{topic}}-{{partition}}"
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "type": "timeseries",
+   "title": "JVM heap used",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 32,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bytes",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "ember_jvm_heap_used_bytes",
+     "legendFormat": "node {{node}}"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "ember_jvm_heap_max_bytes",
+     "legendFormat": "max node {{node}}"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "type": "timeseries",
+   "title": "Open file descriptors and threads",
+   "description": "Both should stay flat over hours. A line that only climbs is a leak.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 32,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "ember_process_open_fds",
+     "legendFormat": "fds node {{node}}"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "ember_jvm_threads",
+     "legendFormat": "threads node {{node}}"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "type": "timeseries",
+   "title": "Raft fsync p99 latency",
+   "description": "Every acknowledged produce waits for fsync on a majority: this is usually the floor of produce latency.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 40,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "histogram_quantile(0.99, sum by (le, node) (rate(ember_raft_fsync_seconds_bucket[1m])))",
+     "legendFormat": "p99 node {{node}}"
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "type": "timeseries",
+   "title": "Raft apply latency p99 (propose to applied)",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "ember-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 40,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 8
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "ember-prometheus"
+     },
+     "expr": "histogram_quantile(0.99, sum by (le, node, group) (rate(ember_raft_apply_latency_seconds_bucket[1m])))",
+     "legendFormat": "{{group}} node {{node}}"
+    }
+   ]
+  }
+ ],
+ "templating": {
+  "list": []
+ },
+ "annotations": {
+  "list": []
+ }
+}

@@ -38,9 +38,11 @@ public final class EmberCli {
               group commit-probe --group=g --topic=t [--for-ms=20000]   (commit every 20 ms, print each outcome)
               consume-bench --topic=t --expect=N --mode=manual|group [--auto-commit=true|false]   (steady-state read throughput)
               metadata     [--topic=t]
-              bench        [--topic=t] [--partitions=3] [--producers=1] [--records=200000] [--value-bytes=100] [--batch=500]""";
-
-    private static final int KEY_BYTES = 10;       // bench keys look like "key-123456"
+              bench        [--topic=t] [--partitions=3] [--producers=1] [--records=200000] [--value-bytes=100] [--batch=500]
+                           [--warmup-records=0] [--rate=N records/s total (fixed-rate mode; default closed loop)] [--csv=FILE] [--acks-timeout=MS]
+              cluster status  --admin=h1:p1,h2:p2     (nodes, readiness, controller, coordinator, role of every node in every Raft group)
+              cluster metrics --admin=h:p [--filter=ember_raft]
+              healthcheck  [--admin=localhost:8080]   (exit 0 only when /health/ready is 200)""";
 
     private EmberCli() {
     }
@@ -76,9 +78,9 @@ public final class EmberCli {
             return 2;
         }
         try {
-            boolean groupCommand = args[0].equals("group");
+            boolean groupCommand = args[0].equals("group") || args[0].equals("cluster");
             if (groupCommand && args.length < 2) {
-                throw new IllegalArgumentException("group needs a subcommand: describe or offsets");
+                throw new IllegalArgumentException(args[0] + " needs a subcommand");
             }
             Flags flags = new Flags(args, groupCommand ? 2 : 1);
             ClientConfig cfg = clientConfig(flags);
@@ -93,8 +95,20 @@ public final class EmberCli {
                         consume(cfg, flags, out, shouldStop);
                     }
                 }
-                case "group" -> GroupCli.run(args[1], cfg, flags, out);
+                case "group" -> {
+                    if (!args[0].equals("group")) {
+                        throw new IllegalArgumentException("unreachable");
+                    }
+                    GroupCli.run(args[1], cfg, flags, out);
+                }
                 case "consume-bench" -> GroupCli.consumeBench(cfg, flags, out);
+                case "cluster" -> ClusterCli.run(args[1], flags, out);
+                case "healthcheck" -> {
+                    int code = ClusterCli.healthcheck(flags, out, err);
+                    if (code != 0) {
+                        return code;
+                    }
+                }
                 case "metadata" -> metadata(cfg, flags, out);
                 case "bench" -> {
                     if (!bench(cfg, flags, out)) {
@@ -261,133 +275,6 @@ public final class EmberCli {
 
     /** Returns false if the verification failed. */
     private static boolean bench(ClientConfig cfg, Flags flags, PrintStream out) throws IOException {
-        String topic = flags.get("topic", "bench-" + System.currentTimeMillis());
-        int partitions = flags.getInt("partitions", 3);
-        int producers = flags.getInt("producers", 1);
-        int records = flags.getInt("records", 200_000);
-        int valueBytes = flags.getInt("value-bytes", 100);
-        int batchSize = flags.getInt("batch", 500);
-        if (partitions < 1 || producers < 1 || records < 1 || valueBytes < 0 || batchSize < 1) {
-            throw new IllegalArgumentException("partitions, producers, records and batch must be >= 1, value-bytes >= 0");
-        }
-        long recordBytes = LogRecord.HEADER_SIZE + KEY_BYTES + valueBytes;
-
-        // 1. make sure the topic exists, and remember where each partition ends NOW so we read back only our records
-        long[] baseline;
-        try (ClusterClient admin = new ClusterClient(cfg)) {
-            try {
-                admin.createTopic(topic, partitions);
-            } catch (EmberException e) {
-                if (e.errorCode() != ErrorCode.TOPIC_ALREADY_EXISTS) {
-                    throw e;
-                }
-            }
-            baseline = endOffsets(admin, topic);
-        }
-        out.println("bench: topic=" + topic + " partitions=" + baseline.length + " producers=" + producers
-                + " records=" + records + " valueBytes=" + valueBytes + " batch=" + batchSize);
-
-        // 2. P producer threads, each with its own connection, records split evenly
-        ExecutorService pool = Executors.newFixedThreadPool(producers);
-        CountDownLatch start = new CountDownLatch(1);
-        List<Future<Void>> futures = new ArrayList<>();
-        ClientConfig config = cfg.withAutoCreate(true, partitions);
-        java.util.concurrent.atomic.AtomicLong retriedSends = new java.util.concurrent.atomic.AtomicLong();
-        byte[] value = new byte[valueBytes];
-        java.util.Arrays.fill(value, (byte) 'x');
-        for (int t = 0; t < producers; t++) {
-            final int share = records / producers + (t < records % producers ? 1 : 0);
-            final long seed = t + 1;
-            futures.add(pool.submit(() -> {
-                Random random = new Random(seed);
-                try (EmberProducer producer = new EmberProducer(config)) {
-                    start.await();
-                    for (int sent = 0; sent < share; ) {
-                        int n = Math.min(batchSize, share - sent);
-                        List<ProducerRecord> batch = new ArrayList<>(n);
-                        for (int i = 0; i < n; i++) {
-                            batch.add(new ProducerRecord(String.format("key-%06d", random.nextInt(1_000_000))
-                                    .getBytes(StandardCharsets.US_ASCII), value));
-                        }
-                        producer.sendBatch(topic, batch);
-                        sent += n;
-                    }
-                    retriedSends.addAndGet(producer.retriedRequests());
-                }
-                return null;
-            }));
-        }
-        long begin = System.nanoTime();
-        start.countDown();
-        try {
-            for (Future<Void> f : futures) {
-                f.get();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("interrupted", e);
-        } catch (ExecutionException e) {
-            if (e.getCause() instanceof IOException io) {
-                throw io;
-            }
-            if (e.getCause() instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new IOException(e.getCause());
-        } finally {
-            pool.shutdownNow();
-        }
-        report(out, "produce:", records, records * recordBytes, System.nanoTime() - begin);
-        out.println("retried requests during produce: " + retriedSends.get());
-
-        // 3. read back with ONE consumer, from the baseline, and verify
-        long[] expectedNext = baseline.clone();
-        long read = 0, readBytes = 0;
-        boolean contiguous = true;
-        begin = System.nanoTime();
-        try (EmberConsumer consumer = new EmberConsumer(cfg)) {
-            for (int p = 0; p < baseline.length; p++) {
-                consumer.assign(topic, p, baseline[p]);
-            }
-            while (read < records) {
-                List<ConsumedRecord> batch = consumer.poll(1024 * 1024);
-                if (batch.isEmpty()) {
-                    break;
-                }
-                for (ConsumedRecord c : batch) {
-                    LogRecord r = c.record();
-                    if (r.offset() != expectedNext[c.partition()]) {
-                        contiguous = false;
-                    }
-                    expectedNext[c.partition()] = r.offset() + 1;
-                    readBytes += r.sizeInBytes();
-                    read++;
-                }
-            }
-        }
-        report(out, "read:", read, readBytes, System.nanoTime() - begin);
-
-        boolean ok = read == records && contiguous;
-        out.println(ok ? "verify: OK (" + read + " records read back, every partition contiguous)"
-                : "verify: FAILED (produced " + records + ", read " + read + ", contiguous=" + contiguous + ")");
-        return ok;
-    }
-
-    private static long[] endOffsets(ClusterClient client, String topic) throws IOException {
-        List<PartitionView> partitions = client.describe(topic);
-        if (partitions != null) {
-            long[] ends = new long[partitions.size()];
-            for (PartitionView p : partitions) {
-                ends[p.partition()] = p.logEndOffset();
-            }
-            return ends;
-        }
-        throw new EmberException(ErrorCode.UNKNOWN_TOPIC_OR_PARTITION);
-    }
-
-    private static void report(PrintStream out, String what, long records, long bytes, long nanos) {
-        double seconds = nanos / 1e9;
-        out.println(String.format(Locale.ROOT, "%-9s %,d records in %.2f s = %,.0f records/s, %.2f MB/s",
-                what, records, seconds, records / seconds, bytes / 1e6 / seconds));
+        return BenchRunner.run(cfg, flags, out);
     }
 }

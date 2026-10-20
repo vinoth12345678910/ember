@@ -315,6 +315,8 @@ public final class RaftNode {
         leaderId = -1;
         votesReceived.clear();
         electionDeadlineMs = nowMs + randomElectionTimeout();
+        long term = storage.currentTerm();
+        notifications.add(() -> listener.onCheckQuorumStepDown(config.nodeId(), term));
         notifyRoleIfChanged();
     }
 

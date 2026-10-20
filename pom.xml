@@ -18,12 +18,14 @@
     </properties>
 
     <modules>
+        <module>ember-metrics</module>
         <module>ember-storage</module>
         <module>ember-protocol</module>
         <module>ember-broker</module>
         <module>ember-client</module>
         <module>ember-raft</module>
         <module>ember-replication</module>
+        <module>ember-chaos</module>
     </modules>
 
     <dependencyManagement>

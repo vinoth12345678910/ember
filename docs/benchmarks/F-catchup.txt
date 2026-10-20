@@ -1,0 +1,3 @@
+catch-up: broker 3, missed 100,000 records: ready and holding them all 2792 ms after the restart command
+catch-up: broker 3, missed 100,000 records: ready and holding them all 2212 ms after the restart command
+catch-up: broker 3, missed 100,000 records: ready and holding them all 2569 ms after the restart command

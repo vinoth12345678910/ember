@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.ember.broker.PeerTrafficIsolationTest
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.642 s -- in com.ember.broker.PeerTrafficIsolationTest
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.152 s -- in com.ember.broker.PeerTrafficIsolationTest

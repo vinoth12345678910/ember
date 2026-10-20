@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.ember.raft.sim.CheckerTest
 -------------------------------------------------------------------------------
-Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in com.ember.raft.sim.CheckerTest
+Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.ember.raft.sim.CheckerTest

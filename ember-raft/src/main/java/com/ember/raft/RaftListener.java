@@ -10,4 +10,11 @@ public interface RaftListener {
      * After a restart the node applies again from index 1. NOOP entries are included.
      */
     void onCommitted(int nodeId, long index, LogEntry entry);
+
+    /**
+     * Called when a leader steps down WITHOUT a new term because it has not heard from a majority (CheckQuorum).
+     * A read-only observation for metrics and logs; the default does nothing, so existing listeners are unaffected.
+     */
+    default void onCheckQuorumStepDown(int nodeId, long term) {
+    }
 }

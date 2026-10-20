@@ -1,4 +1,8 @@
 /Users/vinothanandgani/Dev/ember/ember-client/src/test/java/com/ember/client/ClusterClientTest.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/test/java/com/ember/client/EmberClientTest.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/test/java/com/ember/client/FakeServer.java
+/Users/vinothanandgani/Dev/ember/ember-client/src/test/java/com/ember/client/GroupConsumerFetchFailureTest.java
+/Users/vinothanandgani/Dev/ember/ember-client/src/test/java/com/ember/client/LatencyHistogramTest.java
+/Users/vinothanandgani/Dev/ember/ember-client/src/test/java/com/ember/client/MiniJsonTest.java
+/Users/vinothanandgani/Dev/ember/ember-client/src/test/java/com/ember/client/OpenLoopScheduleTest.java
 /Users/vinothanandgani/Dev/ember/ember-client/src/test/java/com/ember/client/SmokeTest.java

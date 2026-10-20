@@ -1,0 +1,2 @@
+failover times (ms, kill -9 of the leader -> first successful produce): [365, 559, 558, 569, 558, 572, 558, 566, 555, 552, 569, 557, 547, 557, 562, 574, 566, 549, 568, 563]
+failover: n=20  min 365 ms  median 559 ms  p90 569 ms  max 574 ms  mean 551 ms

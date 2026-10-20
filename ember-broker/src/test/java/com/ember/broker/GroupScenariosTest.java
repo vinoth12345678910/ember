@@ -331,4 +331,19 @@ class GroupScenariosTest {
             }
         }
     }
+
+    @Test
+    void consumersThatSubscribeBeforeTheTopicExistsGetItsPartitionsOnceItIsCreated(@TempDir Path dir) throws Exception {
+        try (TestCluster c = new TestCluster(dir, 3, false)) {
+            c.awaitCoordinator();
+            try (GroupMember a = member(c, "a", true, "late"); GroupMember b = member(c, "b", true, "late")) {
+                Await.until(20_000, "both consumers to have joined an (empty) group\n" + c.describe(), () -> a.consumer.generation() > 0 && b.consumer.generation() > 0);
+                assertTrue(a.consumer.assignment().isEmpty());
+                ClusterIntegrationTest.createTopic(c, "late", 4);
+                EmberGroupConsumerTest.produce(c, "late", 0, 40);
+                awaitStable(c, 4, a, b);                                          // the coordinator noticed the topic by itself
+                awaitDelivered(c, values(0, 40), a, b);
+            }
+        }
+    }
 }

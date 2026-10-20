@@ -1,0 +1,89 @@
+# A 3-broker Ember cluster.   docker compose up -d --wait        (add --profile observability for Prometheus + Grafana)
+#
+# ADDRESSES: the brokers talk to each other as ember1:9092 .. ember3:9092 (container names, inside the Docker network). Clients on
+# YOUR machine must use the host-mapped ports, so each broker ADVERTISES localhost:19092 / 19093 / 19094. One advertised address per
+# broker is all Ember supports (no multiple listeners): run clients on the host, not in another container.
+#
+# restart: "no" on purpose: the chaos tool decides when a broker dies and comes back.
+# --enable-debug-endpoints exposes GET /debug/partition-checksum (needed by the external chaos checker). Remove it for real use.
+name: ember
+
+x-ember: &ember
+  image: ember:local
+  pull_policy: never      # the image is built locally (ember1 builds it; the others reuse it)
+  restart: "no"
+  mem_limit: 768m
+  environment: &ember-env
+    EMBER_CLUSTER: "1@ember1:9092/localhost:19092,2@ember2:9092/localhost:19093,3@ember3:9092/localhost:19094"
+    EMBER_ADMIN_PORT: "8080"
+    EMBER_OPTS: "--enable-debug-endpoints"
+  healthcheck:
+    test: ["CMD", "java", "-Xmx64m", "-jar", "/app/ember-cli.jar", "healthcheck", "--admin=localhost:8080"]
+    interval: 10s
+    timeout: 8s
+    retries: 6
+    start_period: 30s
+
+services:
+  ember1:
+    <<: *ember
+    build: .
+    container_name: ember1
+    hostname: ember1
+    environment:
+      <<: *ember-env
+      EMBER_NODE_ID: "1"
+    ports: ["19092:9092", "18081:8080"]
+    volumes: ["ember1-data:/data"]
+
+  ember2:
+    <<: *ember
+    container_name: ember2
+    hostname: ember2
+    environment:
+      <<: *ember-env
+      EMBER_NODE_ID: "2"
+    ports: ["19093:9092", "18082:8080"]
+    volumes: ["ember2-data:/data"]
+
+  ember3:
+    <<: *ember
+    container_name: ember3
+    hostname: ember3
+    environment:
+      <<: *ember-env
+      EMBER_NODE_ID: "3"
+    ports: ["19094:9092", "18083:8080"]
+    volumes: ["ember3-data:/data"]
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.55.1
+    container_name: ember-prometheus
+    volumes: ["./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["19090:9090"]
+    depends_on: [ember1, ember2, ember3]
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:11.3.0
+    container_name: ember-grafana
+    environment:
+      # local demo only: anonymous admin access, no login screen
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/ember-dashboard.json"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["13000:3000"]
+    depends_on: [prometheus]
+
+volumes:
+  ember1-data:
+  ember2-data:
+  ember3-data:
+
+networks:
+  default:
+    name: ember-net

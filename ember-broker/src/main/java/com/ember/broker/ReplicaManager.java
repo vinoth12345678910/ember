@@ -1,5 +1,8 @@
 package com.ember.broker;
 
+import com.ember.metrics.Counter;
+import com.ember.metrics.Labels;
+import com.ember.metrics.MetricsRegistry;
 import com.ember.protocol.ProducerRecord;
 import com.ember.protocol.TopicNames;
 import com.ember.raft.RaftConfig;
@@ -81,6 +84,10 @@ public final class ReplicaManager implements AutoCloseable {
         }
     }
 
+    private final Map<Integer, InetSocketAddress> advertised;
+    private final FaultInjector faults;
+    private final MetricsRegistry registry;
+    private final Map<String, Counter> retentionDeleted = new ConcurrentHashMap<>();
     private final BrokerConfig config;
     private final int selfId;
     private final List<Integer> clusterIds;
@@ -102,6 +109,24 @@ public final class ReplicaManager implements AutoCloseable {
     private volatile boolean closed;
 
     public ReplicaManager(BrokerConfig config, Map<Integer, InetSocketAddress> addresses, RaftSender sender) throws IOException {
+        this(config, addresses, sender, new MetricsRegistry());
+    }
+
+    public ReplicaManager(BrokerConfig config, Map<Integer, InetSocketAddress> addresses, RaftSender sender, MetricsRegistry registry) throws IOException {
+        this(config, addresses, sender, registry, FaultInjector.NONE);
+    }
+
+    public ReplicaManager(BrokerConfig config, Map<Integer, InetSocketAddress> addresses, RaftSender sender, MetricsRegistry registry,
+                          FaultInjector faults) throws IOException {
+        this(config, addresses, sender, registry, faults, addresses);
+    }
+
+    /** advertised: what CLIENTS are told about each broker (METADATA, FIND_COORDINATOR); the brokers use `addresses` among themselves. */
+    public ReplicaManager(BrokerConfig config, Map<Integer, InetSocketAddress> addresses, RaftSender sender, MetricsRegistry registry,
+                          FaultInjector faults, Map<Integer, InetSocketAddress> advertised) throws IOException {
+        this.advertised = new TreeMap<>(advertised);
+        this.faults = faults;
+        this.registry = registry;
         this.config = config;
         this.selfId = config.nodeId();
         this.addresses = new TreeMap<>(addresses);
@@ -155,6 +180,7 @@ public final class ReplicaManager implements AutoCloseable {
     private GroupRuntime newGroup(String topic, int partition, StateMachine stateMachine) {
         String name = topic + "-" + partition;
         FileRaftStorage storage = new FileRaftStorage(raftDir.resolve(name), !config.unsafeNoRaftFsync());
+        storage.setFaultInjector(faults);
         // CheckQuorum on: a leader cut off from the cluster must notice and step down
         RaftConfig raftConfig = new RaftConfig(selfId, clusterIds, config.raftElectionMinMs(), config.raftElectionMaxMs(),
                 config.raftHeartbeatMs(), 64, com.ember.raft.Bug.NONE, 1024 * 1024, true);
@@ -162,10 +188,38 @@ public final class ReplicaManager implements AutoCloseable {
         Random random = new Random(System.nanoTime() ^ (selfId * 0x9E3779B97F4A7C15L) ^ name.hashCode());
         GroupRuntime group = new GroupRuntime(name + "@" + selfId, raftConfig, storage, (to, m) -> sender.send(to, topic, partition, m),
                 stateMachine, random, GroupRuntime::monotonicMillis, scheduler, workers, config.maxPendingProduces());
+        group.setFaultInjector(faults);
+        Labels labels = Labels.of("group", name);
+        Counter leaderChanges = registry.counter("ember_raft_leader_changes_total", "Times the known leader of the group changed.", labels);
+        Counter elections = registry.counter("ember_raft_elections_started_total", "Elections this node started (it became a candidate).", labels);
+        Counter stepDowns = registry.counter("ember_raft_checkquorum_stepdowns_total", "Times this leader stepped down because it heard from no majority.", labels);
+        registry.gauge("ember_raft_term", "Current Raft term.", labels, group::term);
+        registry.gauge("ember_raft_role", "0 follower, 1 candidate, 2 leader.", labels, () -> group.role() == com.ember.raft.Role.LEADER ? 2 : group.role() == com.ember.raft.Role.CANDIDATE ? 1 : 0);
+        registry.gauge("ember_raft_commit_index", "Highest log index known to be committed.", labels, group::commitIndex);
+        registry.gauge("ember_raft_last_applied", "Highest log index applied to the state machine.", labels, group::lastApplied);
+        registry.gauge("ember_raft_last_index", "Last index of the Raft log.", labels, group::lastLogIndex);
+        registry.gauge("ember_raft_pending_proposals", "Proposals waiting for their commit on this leader.", labels, group::pendingCount);
+        group.setApplyLatency(registry.latencyHistogram("ember_raft_apply_latency_seconds", "Time from propose to applied on the leader.", labels));
+        storage.instrument(registry.counter("ember_raft_fsync_total", "fsyncs of the Raft log.", labels),
+                registry.latencyHistogram("ember_raft_fsync_seconds", "Duration of Raft log fsyncs.", labels));
+        int[] lastLeader = {-1};
         group.addListener(new com.ember.raft.RaftListener() {          // role changes are rare: worth a log line each
             @Override
             public void onRoleChange(int nodeId, com.ember.raft.Role role, long term, int leaderId) {
                 LOG.log(System.Logger.Level.INFO, "broker {0}: group {1} is now {2} in term {3} (leader {4})", selfId, name, role, term, leaderId);
+                if (role == com.ember.raft.Role.CANDIDATE) {
+                    elections.inc();
+                }
+                if (leaderId >= 0 && leaderId != lastLeader[0]) {
+                    lastLeader[0] = leaderId;
+                    leaderChanges.inc();
+                }
+            }
+
+            @Override
+            public void onCheckQuorumStepDown(int nodeId, long term) {
+                stepDowns.inc();
+                LOG.log(System.Logger.Level.INFO, "broker {0}: group {1} leader stepped down in term {2}: no majority heard (CheckQuorum)", selfId, name, term);
             }
 
             @Override
@@ -184,6 +238,7 @@ public final class ReplicaManager implements AutoCloseable {
         try {
             for (int p = 0; p < count; p++) {
                 Log log = new Log(dataDir.resolve(name + "-" + p), config.segmentBytes(), config.indexIntervalBytes(), config.dataFlush());
+                registerStorageMetrics(name, p, log);
                 PartitionStateMachine sm = new PartitionStateMachine(name + "-" + p, log);
                 GroupRuntime group = newGroup(name, p, sm);
                 replicas.add(new PartitionReplica(name, p, log, sm, group));
@@ -197,6 +252,22 @@ public final class ReplicaManager implements AutoCloseable {
         }
         topics.put(name, new TopicState(name, replicas));         // published only when complete
         LOG.log(System.Logger.Level.INFO, "broker {0}: created topic {1} with {2} partition(s)", selfId, name, count);
+    }
+
+    private void registerStorageMetrics(String topic, int partition, Log log) {
+        Labels labels = Labels.of("topic", topic, "partition", Integer.toString(partition));
+        registry.gauge("ember_log_start_offset", "Oldest offset still in the data log.", labels, log::startOffset);
+        registry.gauge("ember_log_end_offset", "Next offset to be written (the committed end on a leader).", labels, log::nextOffset);
+        registry.gauge("ember_log_segments", "Segment files of the data log.", labels, log::segmentCount);
+        registry.gauge("ember_log_size_bytes", "Bytes in the data log segments.", labels, () -> {
+            try {
+                return log.totalSizeInBytes();
+            } catch (IOException e) {
+                return Double.NaN;
+            }
+        });
+        retentionDeleted.put(topic + "-" + partition, registry.counter("ember_retention_deleted_segments_total",
+                "Segments removed by retention.", labels));
     }
 
     // ------------------------------------------------------------------ lookups
@@ -215,6 +286,10 @@ public final class ReplicaManager implements AutoCloseable {
         List<TopicState> all = new ArrayList<>(topics.values());
         all.sort((a, b) -> a.name().compareTo(b.name()));
         return all;
+    }
+
+    public MetricsRegistry registry() {
+        return registry;
     }
 
     public GroupRuntime metaGroup() {
@@ -262,6 +337,11 @@ public final class ReplicaManager implements AutoCloseable {
 
     public Map<Integer, InetSocketAddress> addresses() {
         return addresses;
+    }
+
+    /** What clients are told. Equal to addresses() unless the cluster was configured with advertised addresses. */
+    public Map<Integer, InetSocketAddress> advertisedAddresses() {
+        return advertised;
     }
 
     /** Raft messages from peers: dropped silently if the group is not known here (yet). */
@@ -322,7 +402,11 @@ public final class ReplicaManager implements AutoCloseable {
             for (PartitionReplica r : t.replicas()) {
                 try {
                     r.dataLog().maybeFlush(nowMs);
-                    r.dataLog().deleteOldSegments(nowMs, config.retentionMs(), config.retentionBytes());
+                    int removed = r.dataLog().deleteOldSegments(nowMs, config.retentionMs(), config.retentionBytes());
+                    Counter deleted = retentionDeleted.get(t.name() + "-" + r.partition());
+                    if (removed > 0 && deleted != null) {
+                        deleted.add(removed);
+                    }
                 } catch (IOException | RuntimeException e) {
                     LOG.log(System.Logger.Level.ERROR, "maintenance failed for " + t.name() + "-" + r.partition(), e);
                 }

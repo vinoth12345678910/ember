@@ -1,0 +1,6 @@
+bench: topic=b-B-3brokers-nofsync-1024B-12p partitions=12 producers=4 records=60000 valueBytes=1024 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 58,000 records after 2,000 warm-up records = 73,236 records/s, 77.78 MB/s
+latency per request of up to 100 records (from the actual send time): p50 5.12 ms  p90 6.78 ms  p99 11.26 ms  p99.9 12.31 ms  max 12.31 ms
+verify: OK (60000 records read back, every partition contiguous)

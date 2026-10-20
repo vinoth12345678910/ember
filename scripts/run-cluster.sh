@@ -16,7 +16,7 @@ for i in $(seq 1 "$N"); do
   if [ -f "$ROOT/broker-$i.pid" ] && kill -0 "$(cat "$ROOT/broker-$i.pid")" 2>/dev/null; then
     echo "broker $i already running (pid $(cat "$ROOT/broker-$i.pid"))"; continue
   fi
-  nohup java -jar "$JAR" --node-id="$i" --cluster="$CLUSTER" --data-dir="$ROOT/data-$i" "${EXTRA[@]}" \
+  nohup java ${JAVA_OPTS:-} -jar "$JAR" --node-id="$i" --cluster="$CLUSTER" --data-dir="$ROOT/data-$i" "${EXTRA[@]}" \
       > "$ROOT/broker-$i.log" 2>&1 &
   echo $! > "$ROOT/broker-$i.pid"
 done

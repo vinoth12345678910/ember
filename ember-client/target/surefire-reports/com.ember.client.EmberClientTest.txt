@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.ember.client.EmberClientTest
 -------------------------------------------------------------------------------
-Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.333 s -- in com.ember.client.EmberClientTest
+Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.329 s -- in com.ember.client.EmberClientTest

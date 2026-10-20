@@ -44,9 +44,18 @@ public record BrokerConfig(
         FlushPolicy dataFlush,          // flush policy of the DATA logs; the Raft logs are the durable truth
         boolean dataFlushExplicit,
         int groupMinSessionMs,          // consumer-group session timeout bounds (Phase 6)
-        int groupMaxSessionMs) {
+        int groupMaxSessionMs,
+        int adminPort,                  // -1 = port + 1000 (disabled if port is 0), 0 = disabled, -2 = any free port (tests)
+        String adminHost,
+        boolean enableDebugEndpoints,
+        String advertiseHost,           // --advertise (null = none given)
+        int advertisePort) {
 
-    public record ClusterMember(int nodeId, String host, int port) {
+    /** host:port is where the BROKERS reach each other; advertisedHost:advertisedPort is what CLIENTS are told (default: the same). */
+    public record ClusterMember(int nodeId, String host, int port, String advertisedHost, int advertisedPort) {
+        public ClusterMember(int nodeId, String host, int port) {
+            this(nodeId, host, port, host, port);
+        }
     }
 
     public static BrokerConfig defaults() {
@@ -56,6 +65,14 @@ public record BrokerConfig(
     /** Legacy (Phase 2/3 LogManager) flush policy. */
     public FlushPolicy flushPolicy() {
         return new FlushPolicy(flushMessages, flushMs);
+    }
+
+    /** The admin port to bind: 0 = none, -2 means "any free port". */
+    public int effectiveAdminPort() {
+        if (adminPort == -1) {
+            return port > 0 ? port + 1000 : 0;
+        }
+        return adminPort;
     }
 
     public boolean singleBroker() {
@@ -95,12 +112,21 @@ public record BrokerConfig(
         boolean dataFlushGiven = false;
         int groupMinSessionMs = 1000;
         int groupMaxSessionMs = 60_000;
+        int adminPort = -1;
+        String adminHost = "127.0.0.1";
+        boolean enableDebugEndpoints = false;
+        String advertiseHost = null;
+        int advertisePort = 0;
 
         for (String arg : args) {
             int eq = arg.indexOf('=');
             String name = arg.startsWith("--") ? (eq < 0 ? arg.substring(2) : arg.substring(2, eq)) : "";
             if (arg.equals("--unsafe-no-raft-fsync")) {                 // a bare switch
                 unsafeNoRaftFsync = true;
+                continue;
+            }
+            if (arg.equals("--enable-debug-endpoints")) {               // a bare switch: OFF unless asked for
+                enableDebugEndpoints = true;
                 continue;
             }
             if (!arg.startsWith("--") || eq < 3) {
@@ -145,6 +171,16 @@ public record BrokerConfig(
                     case "peer-queue-size" -> peerQueueSize = Integer.parseInt(value);
                     case "group-min-session-ms" -> groupMinSessionMs = Integer.parseInt(value);
                     case "group-max-session-ms" -> groupMaxSessionMs = Integer.parseInt(value);
+                    case "admin-port" -> adminPort = value.equals("ephemeral") ? -2 : Integer.parseInt(value);
+                    case "admin-host" -> adminHost = value;
+                    case "advertise" -> {
+                        int colon = value.lastIndexOf(':');
+                        if (colon < 1) {
+                            throw new IllegalArgumentException("--advertise looks like host:port, got: " + value);
+                        }
+                        advertiseHost = value.substring(0, colon);
+                        advertisePort = Integer.parseInt(value.substring(colon + 1));
+                    }
                     case "data-flush" -> {
                         dataFlush = parseDataFlush(value);
                         dataFlushGiven = true;
@@ -176,25 +212,50 @@ public record BrokerConfig(
             }
             port = me.port();
             host = me.host();
+            if (advertiseHost != null) {                                  // --advertise overrides this broker's own third part
+                List<ClusterMember> rewritten = new ArrayList<>();
+                for (ClusterMember m : cluster) {
+                    rewritten.add(m.nodeId() == self ? new ClusterMember(m.nodeId(), m.host(), m.port(), advertiseHost, advertisePort) : m);
+                }
+                cluster = rewritten;
+            }
         }
         return new BrokerConfig(nodeId, host, port, dataDir, segmentBytes, indexIntervalBytes, flushMessages, flushMs,
                 retentionMs, retentionBytes, maxFrameBytes, maxFetchBytes, idleTimeoutMs, autoCreateTopics, handlerThreads,
                 maintenanceIntervalMs, defaultPartitions, maxPartitionsPerTopic, List.copyOf(cluster),
                 raftElectionMinMs, raftElectionMaxMs, raftHeartbeatMs, produceTimeoutMs, maxPendingProduces, peerQueueSize,
-                unsafeNoRaftFsync, dataFlush, dataFlushGiven || legacyFlushGiven, groupMinSessionMs, groupMaxSessionMs);
+                unsafeNoRaftFsync, dataFlush, dataFlushGiven || legacyFlushGiven, groupMinSessionMs, groupMaxSessionMs, adminPort, adminHost, enableDebugEndpoints, advertiseHost, advertisePort);
     }
 
     /** "1@host:9001,2@host:9002" */
     static List<ClusterMember> parseCluster(String value) {
         List<ClusterMember> members = new ArrayList<>();
         for (String entry : value.split(",")) {
-            int at = entry.indexOf('@');
-            int colon = entry.lastIndexOf(':');
-            if (at < 1 || colon < at + 2 || colon == entry.length() - 1) {
-                throw new IllegalArgumentException("bad --cluster entry (expected id@host:port): " + entry);
+            String internal = entry;
+            String advertised = null;
+            int slash = entry.indexOf('/');
+            if (slash >= 0) {                                           // id@host:port/advertisedHost:advertisedPort
+                internal = entry.substring(0, slash);
+                advertised = entry.substring(slash + 1);
             }
-            members.add(new ClusterMember(Integer.parseInt(entry.substring(0, at)), entry.substring(at + 1, colon),
-                    Integer.parseInt(entry.substring(colon + 1))));
+            int at = internal.indexOf('@');
+            int colon = internal.lastIndexOf(':');
+            if (at < 1 || colon < at + 2 || colon == internal.length() - 1) {
+                throw new IllegalArgumentException("bad --cluster entry (expected id@host:port[/advertisedHost:advertisedPort]): " + entry);
+            }
+            String host = internal.substring(at + 1, colon);
+            int port = Integer.parseInt(internal.substring(colon + 1));
+            String advHost = host;
+            int advPort = port;
+            if (advertised != null) {
+                int advColon = advertised.lastIndexOf(':');
+                if (advColon < 1 || advColon == advertised.length() - 1) {
+                    throw new IllegalArgumentException("bad advertised address in --cluster entry (expected host:port): " + entry);
+                }
+                advHost = advertised.substring(0, advColon);
+                advPort = Integer.parseInt(advertised.substring(advColon + 1));
+            }
+            members.add(new ClusterMember(Integer.parseInt(internal.substring(0, at)), host, port, advHost, advPort));
         }
         members.sort(Comparator.comparingInt(ClusterMember::nodeId));
         for (int i = 1; i < members.size(); i++) {

@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      # Builds every module, runs every test (including the in-process chaos runs) and builds the two runnable jars.
+      # The "slow" tests (60-120 s chaos runs) are excluded; run them with: mvn -B verify -Pcluster-long
+      - name: mvn verify
+        run: mvn -B verify
+      - name: Upload test reports when the build fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: |
+            **/target/surefire-reports
+            **/chaos-failed-*.jsonl

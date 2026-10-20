@@ -1,0 +1,8 @@
+.git
+.idea
+**/target
+*.iml
+cluster-data
+demo-data
+bench-data
+*.jsonl

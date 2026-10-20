@@ -119,7 +119,7 @@ The barrier of classic Kafka gives the old owners a chance to commit *before* th
 * **Exactly-once.** Duplicates happen after rebalances, consumer crashes and ambiguous commits. The duplicate window is bounded by the commit interval (plus the heartbeat detection delay).
 * **No duplicates between rebalances either**, if the application crashes after processing and before the next commit.
 * **Fresh reads from a deposed coordinator.** DESCRIBE and OFFSET_FETCH are served from the leader's applied state; a coordinator that has been deposed but has not noticed yet may answer slightly stale (CheckQuorum bounds it to about an election timeout). Commits always go through Raft.
-* **Automatic rebalance when a topic is created after subscribing, or when partitions are added.** The partition count is fixed; a subscription to a missing topic gives an empty assignment until the member rejoins with a changed subscription.
+* **Rebalance when partitions are added.** The partition count of a topic is fixed, so there is nothing to rebalance. (A topic that appears *after* the members subscribed, or whose creation had not yet reached the coordinator when they joined, IS picked up: since Phase 7 the coordinator re-derives each group's assignment from the current topic list on its tick and installs a new generation if it differs. Before that fix such members could be left with an empty assignment for ever; found by the Phase 7 chaos test.)
 * **A ghost member after an ambiguous JOIN.** A join that times out may have created a member whose id the client never saw; it expires after one session timeout.
 * Ordering across partitions (as before).
 

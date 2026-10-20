@@ -30,6 +30,14 @@ public final class EmberGroupConsumer implements AutoCloseable {
     private final ClusterClient heartbeatClient;    // heartbeat thread only: its own connections
     private final Object lock = new Object();       // guards the group view below (also read by the heartbeat thread)
 
+    /** The one place a poll talks to partition leaders; replaced in tests to make a fetch fail at an exact moment. */
+    @FunctionalInterface
+    interface Fetcher {
+        FetchResult fetch(String topic, int partition, long offset, int maxBytes) throws IOException;
+    }
+
+    private Fetcher fetcher;
+
     private List<String> topics = List.of();
     private String memberId = "";
     private int generation = -1;
@@ -50,6 +58,7 @@ public final class EmberGroupConsumer implements AutoCloseable {
     public EmberGroupConsumer(GroupConsumerConfig config) {
         this.config = config;
         this.client = new ClusterClient(config.client());
+        this.fetcher = client::fetch;
         this.heartbeatClient = new ClusterClient(config.client().withRetries(2, 50, 500));
         this.heartbeatThread = new Thread(this::heartbeatLoop, "ember-heartbeat-" + config.groupId() + "-" + config.clientId());
         heartbeatThread.setDaemon(true);
@@ -216,13 +225,30 @@ public final class EmberGroupConsumer implements AutoCloseable {
             }
             FetchResult result;
             try {
-                result = client.fetch(p.topic(), p.partition(), position, budget);
+                result = fetcher.fetch(p.topic(), p.partition(), position, budget);
             } catch (EmberException e) {
                 if (e.errorCode() != ErrorCode.OFFSET_OUT_OF_RANGE) {
+                    if (out.isEmpty()) {
+                        throw e;
+                    }
+                    break;                                // return what earlier partitions gave; this one is retried on the next poll
+                }
+                try {
+                    resetAfterOutOfRange(p);              // retention removed the data: apply the policy
+                } catch (IOException ioe) {
+                    if (out.isEmpty()) {
+                        throw ioe;
+                    }
+                    break;
+                }
+                continue;
+            } catch (IOException e) {
+                if (out.isEmpty()) {
                     throw e;
                 }
-                resetAfterOutOfRange(p);                  // retention removed the data: apply the policy
-                continue;
+                // Positions of the partitions already read have moved. Throwing now would DROP those records and skip them for
+                // ever, so hand them to the application; the failing partition is simply tried again on the next poll.
+                break;
             }
             for (LogRecord r : result.records()) {
                 out.add(new GroupRecord(p.topic(), p.partition(), r.offset(), r.key(), r.value(), r.timestamp()));
@@ -265,8 +291,11 @@ public final class EmberGroupConsumer implements AutoCloseable {
     /**
      * Commits the current position (the next offset to read) of every owned partition that moved since the last
      * commit. Throws CommitFailedException when this consumer is no longer the owner.
+     *
+     * @return true if a commit was SENT and acknowledged; false if there was nothing to commit (no position moved, or the
+     *         consumer is between two generations), in which case the coordinator was not contacted at all
      */
-    public void commitSync() throws IOException {
+    public boolean commitSync() throws IOException {
         String id;
         int gen;
         List<PartitionOffset> offsets = new ArrayList<>();
@@ -274,7 +303,7 @@ public final class EmberGroupConsumer implements AutoCloseable {
             id = memberId;
             gen = generation;
             if (id.isEmpty() || rebalanceNeeded.get()) {
-                return;                                   // nothing is owned right now
+                return false;                             // nothing is owned right now
             }
             for (PartitionRef p : assignment) {
                 Long position = positions.get(p);
@@ -284,7 +313,7 @@ public final class EmberGroupConsumer implements AutoCloseable {
             }
         }
         if (offsets.isEmpty()) {
-            return;
+            return false;                                 // no position moved since the last commit: nothing was sent
         }
         try {
             client.offsetCommit(config.groupId(), id, gen, offsets);
@@ -304,6 +333,7 @@ public final class EmberGroupConsumer implements AutoCloseable {
                 }
             }
         }
+        return true;
     }
 
     // ------------------------------------------------------------------ heartbeat thread
@@ -417,6 +447,19 @@ public final class EmberGroupConsumer implements AutoCloseable {
     }
 
     // ------------------------------------------------------------------ test hooks (named so nobody uses them by accident)
+
+    /** Unit tests only: pretend the join gave these partitions at these positions, and fetch through the given function. */
+    void adoptForTesting(Map<PartitionRef, Long> startPositions, Fetcher testFetcher) {
+        synchronized (lock) {
+            memberId = "test-member";
+            generation = 1;
+            assignment = new TreeSet<>(startPositions.keySet());
+            positions.clear();
+            positions.putAll(startPositions);
+            this.fetcher = testFetcher;
+        }
+        rebalanceNeeded.set(false);
+    }
 
     /** Stops or resumes the heartbeats WITHOUT leaving: simulates a paused or partitioned consumer (a zombie in the making). */
     public void pauseHeartbeatsForTesting(boolean paused) {

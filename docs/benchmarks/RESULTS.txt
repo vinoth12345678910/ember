@@ -1,0 +1,107 @@
+machine: Apple M4, 10 cores, 16 GiB RAM, macOS 27.0.1, java version "21.0.12.1" 2026-08-18 LTS
+
+##### A: 3 brokers, Raft fsync ON
+=== A-3brokers-fsync-100B-3p: 3 broker(s), 3 partitions, 100B values, 50000 records, 4 producers
+bench: topic=b-A-3brokers-fsync-100B-3p partitions=3 producers=4 records=50000 valueBytes=100 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 48,000 records after 2,000 warm-up records = 3,491 records/s, 0.48 MB/s
+latency per request of up to 100 records (from the actual send time): p50 114.69 ms  p90 135.17 ms  p99 151.55 ms  p99.9 151.61 ms  max 151.61 ms
+verify: OK (50000 records read back, every partition contiguous)
+=== A-3brokers-fsync-100B-12p: 3 broker(s), 12 partitions, 100B values, 50000 records, 4 producers
+bench: topic=b-A-3brokers-fsync-100B-12p partitions=12 producers=4 records=50000 valueBytes=100 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 16
+failed requests during produce: 0 (0 records)
+measured: 48,000 records after 2,000 warm-up records = 1,031 records/s, 0.14 MB/s
+latency per request of up to 100 records (from the actual send time): p50 385.02 ms  p90 417.79 ms  p99 458.75 ms  p99.9 483.97 ms  max 483.97 ms
+verify: OK (50000 records read back, every partition contiguous)
+=== A-3brokers-fsync-1024B-3p: 3 broker(s), 3 partitions, 1024B values, 30000 records, 4 producers
+bench: topic=b-A-3brokers-fsync-1024B-3p partitions=3 producers=4 records=30000 valueBytes=1024 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 28,000 records after 2,000 warm-up records = 3,841 records/s, 4.08 MB/s
+latency per request of up to 100 records (from the actual send time): p50 106.50 ms  p90 124.93 ms  p99 151.55 ms  p99.9 170.62 ms  max 170.62 ms
+verify: OK (30000 records read back, every partition contiguous)
+=== A-3brokers-fsync-1024B-12p: 3 broker(s), 12 partitions, 1024B values, 30000 records, 4 producers
+bench: topic=b-A-3brokers-fsync-1024B-12p partitions=12 producers=4 records=30000 valueBytes=1024 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 28,000 records after 2,000 warm-up records = 1,222 records/s, 1.30 MB/s
+latency per request of up to 100 records (from the actual send time): p50 335.87 ms  p90 409.60 ms  p99 466.94 ms  p99.9 475.36 ms  max 475.36 ms
+verify: OK (30000 records read back, every partition contiguous)
+
+##### B: 3 brokers, --unsafe-no-raft-fsync
+=== B-3brokers-nofsync-100B-3p: 3 broker(s), 3 partitions, 100B values, 100000 records, 4 producers
+bench: topic=b-B-3brokers-nofsync-100B-3p partitions=3 producers=4 records=100000 valueBytes=100 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 98,000 records after 2,000 warm-up records = 126,680 records/s, 17.48 MB/s
+latency per request of up to 100 records (from the actual send time): p50 2.56 ms  p90 5.25 ms  p99 8.96 ms  p99.9 9.82 ms  max 9.82 ms
+verify: OK (100000 records read back, every partition contiguous)
+=== B-3brokers-nofsync-100B-12p: 3 broker(s), 12 partitions, 100B values, 100000 records, 4 producers
+bench: topic=b-B-3brokers-nofsync-100B-12p partitions=12 producers=4 records=100000 valueBytes=100 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 98,000 records after 2,000 warm-up records = 100,772 records/s, 13.91 MB/s
+latency per request of up to 100 records (from the actual send time): p50 3.78 ms  p90 4.48 ms  p99 7.30 ms  p99.9 16.29 ms  max 16.29 ms
+verify: OK (100000 records read back, every partition contiguous)
+=== B-3brokers-nofsync-1024B-3p: 3 broker(s), 3 partitions, 1024B values, 60000 records, 4 producers
+bench: topic=b-B-3brokers-nofsync-1024B-3p partitions=3 producers=4 records=60000 valueBytes=1024 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 58,000 records after 2,000 warm-up records = 101,485 records/s, 107.78 MB/s
+latency per request of up to 100 records (from the actual send time): p50 3.65 ms  p90 5.12 ms  p99 7.17 ms  p99.9 14.62 ms  max 14.62 ms
+verify: OK (60000 records read back, every partition contiguous)
+=== B-3brokers-nofsync-1024B-12p: 3 broker(s), 12 partitions, 1024B values, 60000 records, 4 producers
+bench: topic=b-B-3brokers-nofsync-1024B-12p partitions=12 producers=4 records=60000 valueBytes=1024 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 58,000 records after 2,000 warm-up records = 73,236 records/s, 77.78 MB/s
+latency per request of up to 100 records (from the actual send time): p50 5.12 ms  p90 6.78 ms  p99 11.26 ms  p99.9 12.31 ms  max 12.31 ms
+verify: OK (60000 records read back, every partition contiguous)
+
+##### C: 1 broker (Raft, fsync ON) vs 3 brokers (A row 100B/3p)
+=== C-1broker-fsync-100B-3p: 1 broker(s), 3 partitions, 100B values, 50000 records, 4 producers
+bench: topic=b-C-1broker-fsync-100B-3p partitions=3 producers=4 records=50000 valueBytes=100 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 48,000 records after 2,000 warm-up records = 9,845 records/s, 1.36 MB/s
+latency per request of up to 100 records (from the actual send time): p50 40.96 ms  p90 47.10 ms  p99 51.20 ms  p99.9 52.67 ms  max 52.67 ms
+verify: OK (50000 records read back, every partition contiguous)
+=== C-1broker-nofsync-100B-3p: 1 broker(s), 3 partitions, 100B values, 100000 records, 4 producers
+bench: topic=b-C-1broker-nofsync-100B-3p partitions=3 producers=4 records=100000 valueBytes=100 batch=100 mode=closed-loop warmup=2000
+retried requests during produce: 12
+failed requests during produce: 0 (0 records)
+measured: 98,000 records after 2,000 warm-up records = 272,292 records/s, 37.58 MB/s
+latency per request of up to 100 records (from the actual send time): p50 1.28 ms  p90 2.24 ms  p99 3.71 ms  p99.9 3.99 ms  max 3.99 ms
+verify: OK (100000 records read back, every partition contiguous)
+
+##### D: fixed-rate latency, 3 brokers fsync ON, single-record requests (batch=1)
+measured: 3,600 records after 400 warm-up records = 117 records/s, 0.02 MB/s
+latency per request of up to 1 records (from the actual send time): p50 33.79 ms  p90 44.03 ms  p99 54.27 ms  p99.9 63.49 ms  max 71.53 ms
+measured max (closed loop, batch=1, 4 producers): 117 records/s
+--- 25% of max = 29 records/s, 580 records
+bench: topic=d-25 partitions=3 producers=4 records=580 valueBytes=100 batch=1 mode=fixed-rate(29 records/s) warmup=58
+measured: 522 records after 58 warm-up records = 29 records/s, 0.00 MB/s
+latency per request of up to 1 records (from the INTENDED send time): p50 29.70 ms  p90 37.89 ms  p99 44.03 ms  p99.9 48.93 ms  max 48.93 ms
+--- 50% of max = 58 records/s, 1160 records
+bench: topic=d-50 partitions=3 producers=4 records=1160 valueBytes=100 batch=1 mode=fixed-rate(58 records/s) warmup=116
+measured: 1,044 records after 116 warm-up records = 58 records/s, 0.01 MB/s
+latency per request of up to 1 records (from the INTENDED send time): p50 30.21 ms  p90 40.96 ms  p99 49.15 ms  p99.9 57.10 ms  max 57.10 ms
+--- 75% of max = 87 records/s, 1740 records
+bench: topic=d-75 partitions=3 producers=4 records=1740 valueBytes=100 batch=1 mode=fixed-rate(87 records/s) warmup=174
+measured: 1,566 records after 174 warm-up records = 87 records/s, 0.01 MB/s
+latency per request of up to 1 records (from the INTENDED send time): p50 28.67 ms  p90 36.86 ms  p99 143.36 ms  p99.9 221.18 ms  max 233.59 ms
+
+##### E: failover, 20 x kill -9 of the partition leader
+--- timings: default
+failover times (ms, kill -9 of the leader -> first successful produce): [770, 979, 783, 766, 759, 776, 770, 773, 989, 767, 765, 756, 769, 583, 773, 1598, 767, 769, 778, 776]
+failover: n=20  min 583 ms  median 770 ms  p90 979 ms  max 1598 ms  mean 823 ms
+--- timings: election150-300
+failover times (ms, kill -9 of the leader -> first successful produce): [365, 559, 558, 569, 558, 572, 558, 566, 555, 552, 569, 557, 547, 557, 562, 574, 566, 549, 568, 563]
+failover: n=20  min 365 ms  median 559 ms  p90 569 ms  max 574 ms  mean 551 ms
+
+##### F: restart catch-up of a broker that missed 100,000 records (3 repetitions)
+catch-up: broker 3, missed 100,000 records: ready and holding them all 2792 ms after the restart command
+catch-up: broker 3, missed 100,000 records: ready and holding them all 2212 ms after the restart command
+catch-up: broker 3, missed 100,000 records: ready and holding them all 2569 ms after the restart command

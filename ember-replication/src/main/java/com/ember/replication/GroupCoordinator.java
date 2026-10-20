@@ -68,7 +68,7 @@ public final class GroupCoordinator {
     private final java.util.Set<String> expiryInFlight = new HashSet<>();
     private long epochTerm = -1;
     private long leaderSinceMs;
-    private long rebalances;
+    private final Map<String, Long> rebalancesByGroup = new HashMap<>();
 
     public GroupCoordinator(String nodeLabel, GroupLog log, GroupStateMachine state, TopicDirectory topics, LongSupplier clock,
                             Supplier<String> idGenerator, Config config) {
@@ -125,7 +125,14 @@ public final class GroupCoordinator {
     }
 
     public synchronized long rebalances() {
-        return rebalances;
+        long total = 0;
+        for (long n : rebalancesByGroup.values()) total += n;
+        return total;
+    }
+
+    /** Rebalances this coordinator performed for the group during its tenure (memory only; restarts after a failover). */
+    public synchronized long rebalancesOf(String groupId) {
+        return rebalancesByGroup.getOrDefault(groupId, 0L);
     }
 
     // ------------------------------------------------------------------ JOIN_GROUP
@@ -164,7 +171,7 @@ public final class GroupCoordinator {
             Object result = proposeAndWait(GroupCommands.encode(command));
             if (result == GroupStateMachine.Result.OK) {
                 touch(groupId, id);
-                countRebalance();
+                countRebalance(groupId);
                 return new JoinResult(ErrorCode.NONE, command.newGeneration(), id, assignmentOf(command, id));
             }
             if (result != GroupStateMachine.Result.STALE_GENERATION) {
@@ -213,7 +220,7 @@ public final class GroupCoordinator {
             Object result = proposeAndWait(GroupCommands.encode(withAssignment(groupId, group.generation(), remaining)));
             if (result == GroupStateMachine.Result.OK) {
                 forget(groupId, memberId);
-                countRebalance();
+                countRebalance(groupId);
                 return ErrorCode.NONE;
             }
             if (result != GroupStateMachine.Result.STALE_GENERATION) {
@@ -310,7 +317,11 @@ public final class GroupCoordinator {
                     expired.add(m.memberId());
                 }
             }
-            if (expired.isEmpty() || !startExpiry(groupId)) {
+            if (expired.isEmpty()) {
+                refreshAssignment(groupId, group);
+                continue;
+            }
+            if (!startExpiry(groupId)) {
                 continue;
             }
             Map<String, GroupCommands.Member> remaining = new TreeMap<>(group.members());
@@ -328,11 +339,49 @@ public final class GroupCoordinator {
                 finishExpiry(groupId);
                 if (error == null && result == GroupStateMachine.Result.OK) {
                     expired.forEach(m -> forget(groupId, m));
-                    countRebalance();
+                    countRebalance(groupId);
                 }
                 // STALE_GENERATION or any failure: the next tick looks again with fresh state
             });
         }
+    }
+
+    /**
+     * The assignment was computed from the topic list this broker knew AT THAT MOMENT. A topic that was created just before the
+     * members subscribed may not have reached this broker yet (a follower applies a new entry when it hears the next commit
+     * index), and an idempotent rejoin would hand out the same empty assignment for ever. So the tick re-derives the assignment
+     * from the CURRENT topic list and installs a new generation if it differs. Partition counts never change, so this fires once
+     * per topic and cannot flap.
+     */
+    private void refreshAssignment(String groupId, GroupStateMachine.GroupData group) {
+        if (group.members().isEmpty()) {
+            return;
+        }
+        GroupCommands.SetMembership desired = withAssignment(groupId, group.generation(), group.members());
+        boolean same = true;
+        for (GroupCommands.Member m : desired.members()) {
+            GroupCommands.Member current = group.members().get(m.memberId());
+            if (current == null || !current.assigned().equals(m.assigned())) {
+                same = false;
+            }
+        }
+        if (same || !startExpiry(groupId)) {
+            return;
+        }
+        LOG.log(System.Logger.Level.INFO, "{0}: group {1}: the topic list changed, installing a new assignment", nodeLabel, groupId);
+        CompletableFuture<Object> future;
+        try {
+            future = log.propose(GroupCommands.encode(desired), config.proposeTimeoutMs());
+        } catch (RuntimeException e) {
+            finishExpiry(groupId);
+            return;
+        }
+        future.whenComplete((result, error) -> {
+            finishExpiry(groupId);
+            if (error == null && result == GroupStateMachine.Result.OK) {
+                countRebalance(groupId);
+            }
+        });
     }
 
     private synchronized boolean startExpiry(String groupId) {
@@ -343,8 +392,8 @@ public final class GroupCoordinator {
         expiryInFlight.remove(groupId);
     }
 
-    private synchronized void countRebalance() {
-        rebalances++;
+    private synchronized void countRebalance(String groupId) {
+        rebalancesByGroup.merge(groupId, 1L, Long::sum);
     }
 
     // ------------------------------------------------------------------ helpers
