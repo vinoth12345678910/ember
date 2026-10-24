@@ -28,6 +28,7 @@ final class WebServer implements AutoCloseable {
     private static final Pattern APP_MESSAGES = Pattern.compile("/api/app/topics/([^/]+)/messages");
     private static final Pattern MESSAGES = Pattern.compile("/api/topics/([^/]+)/messages");
     private static final Pattern USER = Pattern.compile("/api/admin/users/([^/]+)");
+    private static final Pattern QUEUE_DEAD = Pattern.compile("/api/admin/queues/([^/]+)/dead(?:/(retry|discard))?");
     private static final Pattern APP = Pattern.compile("/api/admin/apps/([^/]+)(/rotate-key)?");
 
     private static final Map<String, String> TYPES = Map.of(
@@ -139,6 +140,10 @@ final class WebServer implements AutoCloseable {
             send(ex, e.status, "application/json; charset=utf-8", Json.write(Json.obj("error", e.getMessage())).getBytes(StandardCharsets.UTF_8));
         } catch (IllegalArgumentException | ClassCastException | NullPointerException e) {
             send(ex, 400, "application/json; charset=utf-8", Json.write(Json.obj("error", "bad request")).getBytes(StandardCharsets.UTF_8));
+        } catch (com.ember.client.EmberException e) {
+            boolean unknown = e.errorCode() == com.ember.protocol.ErrorCode.UNKNOWN_SUBSCRIPTION;
+            send(ex, unknown ? 404 : 502, "application/json; charset=utf-8", Json.write(Json.obj("error", unknown ? "no such queue" : "the broker refused the request: " + e.errorCode()))
+                    .getBytes(StandardCharsets.UTF_8));
         } catch (com.ember.client.ProducerOverloadedException e) {
             ex.getResponseHeaders().set("Retry-After", "1");
             send(ex, 503, "application/json; charset=utf-8", Json.write(Json.obj("error", "overloaded: slow down and retry", "retryAfterMs", 1000)).getBytes(StandardCharsets.UTF_8));
@@ -187,6 +192,15 @@ final class WebServer implements AutoCloseable {
             if (path.equals("/api/admin/cluster") && method.equals("GET")) return Json.obj("nodes", gateway.nodes(), "producer", gateway.producerStats());
             if (path.equals("/api/admin/topics") && method.equals("POST")) return createTopic(body(ex));
             if (path.equals("/api/admin/users") && method.equals("GET")) return Json.obj("users", users.list().stream().map(UserStore.User::view).toList());
+            if (path.equals("/api/admin/queues") && method.equals("GET")) return Json.obj("queues", gateway.queues());
+            if (path.equals("/api/admin/queues") && method.equals("POST")) return createQueue(body(ex));
+            Matcher qd = QUEUE_DEAD.matcher(path);
+            if (qd.matches()) {
+                String queue = URLDecoder.decode(qd.group(1), StandardCharsets.UTF_8);
+                checkTopic(queue);
+                if (qd.group(2) == null && method.equals("GET")) return gateway.deadList(queue, Math.max(1, Math.min(500, Integer.parseInt(query.getOrDefault("max", "100")))));
+                if (qd.group(2) != null && method.equals("POST")) return deadAction(queue, qd.group(2).equals("retry"), body(ex));
+            }
             if (path.equals("/api/admin/apps") && method.equals("GET")) return Json.obj("apps", apps.list());
             if (path.equals("/api/admin/apps") && method.equals("POST")) return registerApp(body(ex), now);
             Matcher ap = APP.matcher(path);
@@ -303,6 +317,45 @@ final class WebServer implements AutoCloseable {
             throw new ApiException(409, "you cannot change your own role or disable yourself");
         }
         return Json.obj("user", users.update(name, role, disabled).view());
+    }
+
+    private Object createQueue(Map<String, Object> b) throws IOException {
+        String name = str(b, "name"), topic = str(b, "topic");
+        checkTopic(name);
+        checkTopic(topic);
+        try {
+            int partitions = gateway.createQueue(name, topic, !Boolean.FALSE.equals(b.get("fromStart")), intOf(b, "leaseMs"), intOf(b, "maxAttempts"),
+                    intOf(b, "backoffMs"), intOf(b, "backoffMaxMs"));
+            return Json.obj("name", name, "topic", topic, "partitions", partitions);
+        } catch (com.ember.client.EmberException e) {
+            switch (e.errorCode()) {
+                case SUBSCRIPTION_ALREADY_EXISTS -> throw new ApiException(409, "a queue with that name already exists");
+                case UNKNOWN_TOPIC_OR_PARTITION -> throw new ApiException(400, "that topic does not exist");
+                default -> throw new ApiException(400, "the broker refused the queue: " + e.errorCode());
+            }
+        }
+    }
+
+    private Object deadAction(String queue, boolean retry, Map<String, Object> b) throws IOException {
+        List<long[]> items = new java.util.ArrayList<>();
+        if (!(b.get("items") instanceof List<?> list) || list.isEmpty() || list.size() > 500) throw new ApiException(400, "items must hold 1-500 entries");
+        for (Object o : list) {
+            Map<?, ?> m = (Map<?, ?>) o;
+            items.add(new long[]{((Number) m.get("partition")).longValue(), ((Number) m.get("offset")).longValue()});
+        }
+        try {
+            return gateway.deadAction(queue, retry, items);
+        } catch (com.ember.client.EmberException e) {
+            if (e.errorCode() == com.ember.protocol.ErrorCode.UNKNOWN_SUBSCRIPTION) throw new ApiException(404, "no such queue");
+            throw new ApiException(400, "the broker refused it: " + e.errorCode());
+        }
+    }
+
+    private static int intOf(Map<String, Object> b, String key) {
+        Object v = b.get(key);
+        int n = v == null ? 0 : ((Number) v).intValue();
+        if (n < 0 || n > 86_400_000) throw new ApiException(400, key + " is out of range");
+        return n;
     }
 
     private Object createTopic(Map<String, Object> b) throws IOException {

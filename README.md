@@ -84,7 +84,18 @@ try (QueueConsumer q = new QueueConsumer(config, "matcher", "worker-1")) {
 }
 ```
 
-Measured on one cloud VM (3 brokers, fsync on): 12,371 messages/s claim+ack with 8 workers; with 100 ms of work per batch on 6 partitions, 6 workers (the consumer-group limit) did 529 messages/s and 24 workers did 1,788 (3.4x). Design, failure behaviour and limits (no Raft snapshots yet, one `__acks` leader): [`docs/ack-queue/design.md`](docs/ack-queue/design.md).
+**Retries and dead letters.** `q.nack(batch, "reason")` says the messages could not be processed. They are retried after a growing delay (default 1 s doubling to 60 s) and, after `--max-attempts` failures (default 5), set aside as **dead letters** so they never block the rest. A lease that runs out counts as a failure; `release` does not. An admin retries or discards dead letters from the console (Queues page) or the CLI:
+
+```bash
+java -jar ember-client-all.jar queue-create  --bootstrap=... --subscription=payments --topic=orders --max-attempts=3 --backoff-ms=200 --backoff-max-ms=1000
+java -jar ember-client-all.jar queue-dead    --bootstrap=... --subscription=payments
+java -jar ember-client-all.jar queue-dead-retry   --bootstrap=... --subscription=payments --all      # or --partition=0 --offset=100
+java -jar ember-client-all.jar queue-dead-discard --bootstrap=... --subscription=payments --all
+```
+
+With 12,000 messages where every 100th always fails, 8 workers finished all 11,878 healthy ones (2,916 messages/s end to end) and dead-lettered the 122 poison messages after exactly 3 attempts each. A dead letter keeps holding the partition's progress marker (`floor`) until it is retried or discarded; the record itself stays in the partition log (and is lost to the dead-letter view if retention removes it first).
+
+Measured on one cloud VM (3 brokers, fsync on): 12,371 messages/s claim+ack with 8 workers; with 100 ms of work per batch on 6 partitions, 6 workers (the consumer-group limit) did 529 messages/s and 24 workers did 1,788 (3.4x). Design, failure behaviour and limits (no Raft snapshots yet, one `__acks` leader), including section 12 on retries and dead letters: [`docs/ack-queue/design.md`](docs/ack-queue/design.md).
 
 ## Contents
 [Architecture](#architecture) · [Design concepts](#design-concepts) · [Features](#features) · [Quickstart](#quickstart-docker) · [Guarantees](#guarantees-and-non-guarantees) · [Performance](#measured-performance) · [Testing](#how-i-tested-it) · [Failure matrix](#failure-matrix-summary) · [Structure](#project-structure) · [Build and run](#build-and-run) · [Limitations](#known-limitations)

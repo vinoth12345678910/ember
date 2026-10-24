@@ -7,6 +7,8 @@ import com.ember.client.FetchResult;
 import com.ember.client.PartitionView;
 import com.ember.client.RecordMetadata;
 import com.ember.protocol.ClusterMetadataResponse;
+import com.ember.protocol.QueueDeadListResponse;
+import com.ember.protocol.QueueHandle;
 import com.ember.storage.LogRecord;
 
 import java.io.IOException;
@@ -163,6 +165,41 @@ final class BrokerGateway implements AutoCloseable {
         } catch (CharacterCodingException e) {
             return "base64:" + Base64.getEncoder().encodeToString(bytes);
         }
+    }
+
+    // ------------------------------------------------------------------ ack queues (admin)
+
+    int createQueue(String name, String topic, boolean fromStart, int leaseMs, int maxAttempts, int backoffMs, int backoffMaxMs) throws IOException {
+        return client.queueCreate(name, topic, fromStart, leaseMs, maxAttempts, backoffMs, backoffMaxMs);
+    }
+
+    Map<String, Object> deadList(String queue, int max) throws IOException {
+        QueueDeadListResponse r = client.queueDeadList(queue, max);
+        List<Object> items = new ArrayList<>();
+        for (QueueDeadListResponse.DeadMessage m : r.items()) {
+            items.add(Json.obj("partition", m.partition(), "offset", m.offset(), "attempts", m.attempts(), "failures", m.failures(), "deadAt", m.deadAt(),
+                    "reason", m.reason(), "key", m.key() == null ? null : text(m.key()), "value", text(m.value())));
+        }
+        return Json.obj("total", r.total(), "items", items);
+    }
+
+    /** retry = back into the queue with a fresh failure budget; otherwise discard = finished for good. Returns {settled, rejected}. */
+    Map<String, Object> deadAction(String queue, boolean retry, List<long[]> partitionOffsets) throws IOException {
+        List<QueueHandle> handles = new ArrayList<>();
+        for (long[] po : partitionOffsets) handles.add(new QueueHandle((int) po[0], po[1], 0));
+        var r = client.queueSettle(retry ? com.ember.protocol.ApiKey.QUEUE_DEAD_RETRY : com.ember.protocol.ApiKey.QUEUE_DEAD_DISCARD, queue, "console", handles, 0);
+        return Json.obj("settled", r.settled(), "rejected", r.rejected());
+    }
+
+    /** The subscriptions as the first reachable broker reports them (they are replicated, so any broker will do). */
+    List<Object> queues() {
+        for (Object o : nodes()) {
+            Map<?, ?> node = (Map<?, ?>) o;
+            if (Boolean.TRUE.equals(node.get("up")) && ((Map<?, ?>) node.get("status")).get("subscriptions") instanceof List<?> subs) {
+                return new ArrayList<>(subs);
+            }
+        }
+        return List.of();
     }
 
     // ------------------------------------------------------------------ cluster health (admin ports)
