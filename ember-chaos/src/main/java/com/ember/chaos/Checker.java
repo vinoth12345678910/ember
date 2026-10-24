@@ -476,6 +476,18 @@ public final class Checker {
             if (!s.ok() || s.settled() < 1) continue;
             boolean finishedBefore = s.action().equals("ack") && firstAckDone.getOrDefault(s.msg(), Long.MAX_VALUE) < s.invokeTime();
             if (finishedBefore) continue;                                                   // acking something already finished is an accepted no-op
+            // An ack takes effect somewhere between its invoke and its completion, so another ack that was INVOKED before this one
+            // completed may already have finished the message by the time this one was applied (also an accepted no-op).
+            boolean maybeFinishedMeanwhile = false;
+            if (s.action().equals("ack")) {
+                for (Settle other : settles) {
+                    if (other != s && other.ok() && other.settled() > 0 && other.action().equals("ack") && other.msg().equals(s.msg()) && other.invokeTime() < s.completeTime()) {
+                        maybeFinishedMeanwhile = true;
+                        break;
+                    }
+                }
+            }
+            if (maybeFinishedMeanwhile) continue;
             for (Delivery d : byMsg.getOrDefault(s.msg(), List.of())) {
                 if (d.attempt() > s.attempt() && d.completeTime() < s.invokeTime()) {
                     violate("P12_FENCED_SETTLE_ACCEPTED", "message " + s.msg() + ": " + s.action() + " of attempt " + s.attempt() + " was accepted although attempt " + d.attempt()

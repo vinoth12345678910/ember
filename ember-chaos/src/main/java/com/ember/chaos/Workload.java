@@ -103,7 +103,17 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
             }
         }
         if (config.queueWorkers() > 0) {
-            QueueConsumer.createSubscription(clientConfig.withRetries(40, 100, 500), config.queue(), config.topic(), true, QUEUE_LEASE_MS, QUEUE_MAX_ATTEMPTS, 100, 300);
+            // The topic was just created on the metadata leader; the __acks leader may not have applied it yet (it hears about it with
+            // the next commit index), and then answers UNKNOWN_TOPIC_OR_PARTITION. That is a setup race, not a fault: wait briefly.
+            for (int attempt = 0; ; attempt++) {
+                try {
+                    QueueConsumer.createSubscription(clientConfig.withRetries(40, 100, 500), config.queue(), config.topic(), true, QUEUE_LEASE_MS, QUEUE_MAX_ATTEMPTS, 100, 300);
+                    break;
+                } catch (EmberException e) {
+                    if (e.errorCode() != ErrorCode.UNKNOWN_TOPIC_OR_PARTITION || attempt >= 50) throw e;
+                    java.util.concurrent.locks.LockSupport.parkNanos(100_000_000L);
+                }
+            }
         }
     }
 
