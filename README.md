@@ -1,20 +1,130 @@
 <h1 align="center">Ember</h1>
-<p align="center"><b>A Kafka-style distributed message broker, built from scratch in plain Java 21.</b><br>
-Raft-replicated partitions · consumer groups · observability · chaos-verified</p>
+<p align="center"><b>A Raft-replicated, Kafka-style message broker with per-message acknowledgement, built from scratch in plain Java 21.</b><br>
+Topics and consumer groups · ack queues with retries and dead letters · a web console · chaos-verified</p>
 
 <p align="center">
 <img alt="Java 21" src="https://img.shields.io/badge/Java-21-orange">
 <img alt="Build" src="https://img.shields.io/badge/build-Maven-blue">
-<img alt="Tests" src="https://img.shields.io/badge/tests-747%20passing-brightgreen">
+<img alt="Tests" src="https://img.shields.io/badge/tests-876%20passing-brightgreen">
 <img alt="Dependencies" src="https://img.shields.io/badge/dependencies-Netty%20only-lightgrey">
 <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
 </p>
 
-Topics are split into partitions. Every partition is replicated on three brokers and kept consistent by **Raft**, so a message Ember acknowledged survives the loss of any one broker, including the leader. Consumers share work in **consumer groups** with replicated offsets. The cluster can be watched (metrics, health, status), attacked (a chaos tool with an independent history checker) and started with one `docker compose up`.
+<p align="center">
+<a href="docs/media/ember-demo.mp4"><img src="docs/media/ember-demo.gif" alt="Ember console: a broker is killed with kill -9 while a live ride-dispatch system keeps running" width="760"></a><br>
+<sub>Real screen recording (<a href="docs/media/ember-demo.mp4">full-quality mp4</a>): <code>kill -9</code> on one of three brokers while 2,000 simulated drivers and a billing service keep working, the broker comes back and catches up, then the bank goes down and billing retries pile up and drain.</sub>
+</p>
 
-The storage engine, wire protocol, Raft, metrics library, JSON handling and chaos checker are all written in this repository. The only dependencies are Netty and the Maven shade plugin.
+## What Ember is
 
-**Tests:** 747 tests, 0 failures (metrics 15, storage 55, raft 182, protocol 97, replication 92, client 39, broker 215, chaos 52), about 5.5 minutes; the `cluster-long` profile adds three 120 s chaos runs.
+Ember stores streams of messages in **topics** split into **partitions**. Every partition is its own **Raft** group on three brokers, so a message Ember has acknowledged survives the loss of any one broker, including the leader. You can read the stream two ways:
+
+* **Consumer groups**, as in Kafka: members share partitions, offsets are replicated, a stale consumer is fenced out. Rebalancing is eager by default, or **cooperative** (`--group-rebalance=cooperative`) so partitions that stay with their owner are never interrupted.
+* **Ack queues**, which Kafka does not have: every message is claimed, leased and acknowledged **individually**. A message that keeps failing is retried with backoff and then set aside as a **dead letter** instead of blocking everything behind it, and you can run far more workers than there are partitions.
+
+Around the broker there is a **web console** for consumers and administrators, **app API keys** with per-topic permissions, a **Node SDK**, a **ride-dispatch demo (Ember Fleet)** and a **chaos tool** with an independent history checker. The storage engine, wire protocol, Raft, metrics, JSON handling and the checker are all written in this repository; the only dependency is Netty.
+
+## See it working
+
+Everything below was captured from a real 3-broker cluster running on one machine (`scripts/run-cluster.sh`), the console, and the Fleet demo. Nothing is mocked.
+
+### Live Fleet: a dispatch system built on Ember
+
+2,000 simulated drivers ping their location, riders request rides, a matcher assigns the nearest free driver, trips complete and billing charges a flaky bank. Each service is a separate app with its own key and its own ack queue. The **Break things** panel takes the bank down or crashes workers.
+
+![Live Fleet](docs/media/14-live-fleet.png)
+
+With the bank down, `billing` retries pile up (118 retrying, 12 already dead-lettered) while tracking and matching carry on; when the bank returns they drain.
+
+<table>
+<tr><td width="50%"><img src="docs/media/15-live-fleet-bank-down.png" alt="Live Fleet with the bank down"></td>
+<td width="50%"><img src="docs/media/16-queues-during-outage.png" alt="Queues page during the outage"></td></tr>
+<tr><td align="center"><sub>Bank outage: retries climb, nothing is lost</sub></td><td align="center"><sub>Queues: waiting, in flight, retrying, dead letters, retry policy</sub></td></tr>
+</table>
+
+### A broker dies, the cluster does not
+
+<table>
+<tr><td width="50%"><img src="docs/media/17-broker-killed.png" alt="Cluster health with one broker down"></td>
+<td width="50%"><img src="docs/media/19-broker-recovered.png" alt="Cluster health after the broker returned"></td></tr>
+<tr><td align="center"><sub>After <code>kill -9</code> on broker 2: degraded, quorum holds, new leaders elected</sub></td><td align="center"><sub>Broker 2 restarted: it catches up by itself and the cluster is healthy again</sub></td></tr>
+</table>
+
+### Console for consumers and administrators
+
+<table>
+<tr><td width="50%"><img src="docs/media/01-landing.png" alt="Landing page"></td>
+<td width="50%"><img src="docs/media/09-admin-overview.png" alt="Admin: cluster health and Raft groups"></td></tr>
+<tr><td align="center"><sub>Landing page</sub></td><td align="center"><sub>Admin: brokers, controller, group coordinator, every Raft group</sub></td></tr>
+<tr><td width="50%"><img src="docs/media/03-consumer-dashboard.png" alt="Consumer dashboard"></td>
+<td width="50%"><img src="docs/media/07-consumer-groups.png" alt="Consumer groups with live members"></td></tr>
+<tr><td align="center"><sub>Consumer workspace</sub></td><td align="center"><sub>Consumer groups and their members</sub></td></tr>
+<tr><td width="50%"><img src="docs/media/06-browse-messages.png" alt="Browse messages"></td>
+<td width="50%"><img src="docs/media/12-admin-apps.png" alt="Registered apps with API keys"></td></tr>
+<tr><td align="center"><sub>Browse messages by partition and offset</sub></td><td align="center"><sub>Apps: one API key per service, limited to the topics it needs</sub></td></tr>
+</table>
+
+### On the command line
+
+<table>
+<tr><td width="50%"><img src="docs/media/cli-cluster-and-group.png" alt="ember cluster status and group describe"></td>
+<td width="50%"><img src="docs/media/chaos-run.png" alt="A chaos run with zero violations"></td></tr>
+<tr><td align="center"><sub>Raft leaders per group, and a consumer group with its lag and owners</sub></td><td align="center"><sub>25 s of crashes, pauses, link cuts and delays: 0 violations</sub></td></tr>
+</table>
+
+More screenshots are in [`docs/media`](docs/media).
+
+## Why not just Kafka
+
+| | Consumer group (Kafka-style) | Ember ack queue |
+|---|---|---|
+| A poison message | Blocks its partition, or you skip it and lose it | Retried with backoff, then dead-lettered, kept and listable |
+| Parallelism | At most one consumer per partition | 24 workers on 6 partitions (3.4x the throughput in the benchmark) |
+| A worker crashes mid-message | Rebalance, everyone stops and repeats uncommitted work | Only that worker's leases expire; the message goes to another worker |
+| Stale worker finishes late | Offset commit fenced by generation | Its ack is rejected by attempt number |
+
+On the same 3,000 messages with every 100th poisoned, a consumer group retrying in place was still stuck after 30 s, one skipping poison messages lost all 30, and an ack queue finished with nothing lost (11.1 s with 6 workers, 3.1 s with 24). Measured on one cloud VM, single runs: read it for the shape, not the seconds. Details and caveats: [`demo/fleet`](demo/fleet/README.md), [`docs/LIMITS.md`](docs/LIMITS.md).
+
+## Quick start
+
+Needs Java 21 and Maven; Node 18+ for the demo and SDK. No Docker required.
+
+```bash
+mvn -q package -DskipTests
+scripts/run-cluster.sh 3 19001 ./cluster-data --unsafe-no-raft-fsync     # 3 real broker processes (drop the flag for durable fsync)
+
+java -jar ember-web/target/ember-web-0.1.0-SNAPSHOT-all.jar \
+  --bootstrap=localhost:19001,localhost:19002,localhost:19003 --admin=localhost:20001,localhost:20002,localhost:20003 \
+  --secret=$(openssl rand -hex 24) --admin-password=choose-a-password       # console on http://localhost:8088
+
+cd demo/fleet && EMBER_ADMIN_USER=admin EMBER_ADMIN_PASSWORD=choose-a-password node bin/setup.js
+node bin/live.js --drivers 2000 --riders 10                                 # then open the console: Live Fleet
+```
+
+With Docker instead: `docker compose up -d --build --wait` starts three brokers ([details](#quickstart-docker)). A guided tour of the demo: [`docs/FLEET-DEMO.md`](docs/FLEET-DEMO.md).
+
+### Use it from your code
+
+```js
+const { Ember } = require('@ember/sdk');                       // sdk/node, no dependencies
+const ember = new Ember({ baseUrl: 'http://localhost:8088', apiKey: process.env.EMBER_KEY });
+
+await ember.publish('orders', { key: 'o-1', value: { total: 12 } });
+
+ember.worker('fulfil', async message => {
+  await ship(message.json());                                  // returns: acked. throws: retried with backoff, dead-lettered after N attempts
+}, { name: 'worker-1', concurrency: 20, order: 'key' }).start();
+```
+
+Java client, CLI and protocol: see [Build and run](#build-and-run) and [`docs/PROTOCOL.md`](docs/PROTOCOL.md).
+
+## How it is verified
+
+**876 automated tests** (847 Java: metrics 15, storage 55, raft 182, protocol 102, replication 139, client 39, broker 228, chaos 70, console 17; plus the Node SDK 18 and Fleet 11). The chaos tool runs real brokers under crashes, pauses, network cuts, slow disks and message loss, records what clients were told and read, and an **independent checker** that never asks the broker looks for lost acknowledged writes, divergence, phantoms, double ownership and fenced settles that were accepted. The checker is itself tested by planting bugs. What it cannot prove is written down in [`docs/LIMITS.md`](docs/LIMITS.md) and [`docs/phase7/design.md`](docs/phase7/design.md).
+
+**Documentation:** [`docs/PROTOCOL.md`](docs/PROTOCOL.md) · [`docs/OPERATIONS.md`](docs/OPERATIONS.md) · [`docs/ack-queue/design.md`](docs/ack-queue/design.md) · [`docs/phase6/cooperative-rebalance.md`](docs/phase6/cooperative-rebalance.md) · [`docs/FLEET-DEMO.md`](docs/FLEET-DEMO.md) · [`docs/LIMITS.md`](docs/LIMITS.md).
+
+---
 
 ## Web console (consumer + admin)
 

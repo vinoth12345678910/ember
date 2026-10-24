@@ -183,7 +183,7 @@ function landing() {
     <div class="stat-tile"><b>3×</b><span>replication per partition</span></div>
     <div class="stat-tile"><b>Raft</b><span>consensus for every partition</span></div>
     <div class="stat-tile"><b>0</b><span>acknowledged messages lost in chaos tests</span></div>
-    <div class="stat-tile"><b>747</b><span>automated tests</span></div>
+    <div class="stat-tile"><b>876</b><span>automated tests</span></div>
   </div>
   <section class="block alt" id="features"><div class="wrap">
     <div class="sec-head"><h2>Everything you need to move events</h2><p>A focused console on top of a broker whose storage engine, protocol and consensus are all written in-house.</p></div>
