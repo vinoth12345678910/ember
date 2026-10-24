@@ -32,7 +32,7 @@ public final class InProcessCollector implements Collector {
 
     private List<GroupRuntime> groupsOf(int broker) {
         ReplicaManager rm = cluster.server(broker).replicaManager();
-        List<GroupRuntime> out = new ArrayList<>(List.of(rm.metaGroup(), rm.groupsGroup()));
+        List<GroupRuntime> out = new ArrayList<>(List.of(rm.metaGroup(), rm.groupsGroup(), rm.acksGroup()));
         ReplicaManager.TopicState t = rm.topic(topic);
         if (t != null) for (ReplicaManager.PartitionReplica r : t.replicas()) out.add(r.group());
         return out;
@@ -55,6 +55,7 @@ public final class InProcessCollector implements Collector {
                         fingerprint.append(log.startOffset()).append('-').append(log.nextOffset()).append(';');
                     }
                     fingerprint.append(cluster.server(i).replicaManager().groupState().snapshot());
+                    fingerprint.append('|').append(cluster.server(i).replicaManager().ackState().fingerprint());
                     if (reference == null) reference = fingerprint.toString();
                     else if (!reference.equals(fingerprint.toString())) return false;
                 }
@@ -74,6 +75,7 @@ public final class InProcessCollector implements Collector {
                 rec.replica(data("scope", "data", "group", topic + "-" + p, "replica", Integer.toString(i), "start", d.start(), "end", d.end(), "crc", d.crc()));
             }
             rec.replica(data("scope", "groupstate", "group", "groups", "replica", Integer.toString(i), "digest", crc(rm.groupState().snapshot().toString())));
+            rec.replica(data("scope", "ackstate", "group", "acks", "replica", Integer.toString(i), "digest", crc(rm.ackState().fingerprint())));
             StringBuilder meta = new StringBuilder();
             for (ReplicaManager.TopicState t : rm.topics()) meta.append(t.name()).append('=').append(t.partitionCount()).append(';');
             rec.replica(data("scope", "metastate", "group", "meta", "replica", Integer.toString(i), "digest", crc(meta.toString())));

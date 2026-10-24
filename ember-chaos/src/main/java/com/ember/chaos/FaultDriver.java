@@ -8,6 +8,11 @@ public interface FaultDriver {
 
     int brokers();
 
+    /** The broker that currently leads the "__acks" group (ack queues), or -1 if unknown. */
+    default int queueLeader() {
+        return -1;
+    }
+
     boolean supports(Fault fault);
 
     /** Dies like kill -9 (no goodbye). */

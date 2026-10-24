@@ -92,6 +92,12 @@ public final class Nemesis {
                 begin(next, "broker " + target);
                 driver.pause(target);
             }
+            case QUEUE_LEADER_CRASH -> {
+                int leader = driver.queueLeader();
+                target = leader > 0 ? leader : 1 + random.nextInt(n);
+                begin(next, "broker " + target + (leader > 0 ? " (the __acks leader)" : ""));
+                driver.crash(target);
+            }
             case ISOLATE -> {
                 target = 1 + random.nextInt(n);
                 begin(next, "broker " + target);
@@ -137,7 +143,7 @@ public final class Nemesis {
     private void stop() throws Exception {
         Fault f = active;
         switch (f) {
-            case CRASH_RESTART -> driver.restart(target);
+            case CRASH_RESTART, QUEUE_LEADER_CRASH -> driver.restart(target);
             case PAUSE -> driver.resume(target);
             case ISOLATE -> driver.heal();
             case LINK -> driver.unblockLink(target, target2);
