@@ -160,8 +160,14 @@ class Worker {
     this.drainMs = o.drainMs == null ? 30000 : o.drainMs;
     this.ackDelayMs = o.ackDelayMs == null ? 5 : o.ackDelayMs;
     this.onError = o.onError || (() => {});
+    this.order = o.order || 'none';                        // 'key': messages with the same key run one at a time, in the order this worker received them
+    if (this.order !== 'none' && this.order !== 'key') throw new TypeError("order must be 'none' or 'key'");
+    this.latestWins = !!o.latestWins;                      // only the newest message of each key is handled; older ones are acked unseen
+    this.latestWinsKeys = o.latestWinsKeys || 100000;      // how many keys' newest offset is remembered (least recently used are forgotten)
+    this._newest = new Map();                              // key -> highest offset handled successfully
+    this._tails = new Map();                               // key -> end of that key's chain (order: 'key')
     this.inFlight = new Map();                             // handle key -> Message (running or waiting to be settled)
-    this.stats = { claimed: 0, acked: 0, nacked: 0, released: 0, rejected: 0 };
+    this.stats = { claimed: 0, acked: 0, nacked: 0, released: 0, rejected: 0, superseded: 0 };
     this._acks = []; this._ackTimer = null; this._settleChain = Promise.resolve();
     this._abort = new AbortController();
     this._stopping = false;
@@ -241,14 +247,57 @@ class Worker {
         break;
       }
       this.stats.claimed += messages.length;
-      for (const m of messages) this._process(m);
+      const skip = this.latestWins ? this._supersededInBatch(messages) : new Set();
+      for (const m of messages) this._process(m, skip.has(m));
     }
   }
 
-  _process(m) {
+  /** In one claimed batch only the newest message of a key matters (the same key is always in the same partition, so a bigger offset is newer). */
+  _supersededInBatch(messages) {
+    const newest = new Map();
+    for (const m of messages) {
+      if (m.key == null) continue;
+      const cur = newest.get(m.key);
+      if (!cur || m.offset > cur.offset) newest.set(m.key, m);
+    }
+    const skip = new Set();
+    for (const m of messages) if (m.key != null && newest.get(m.key) !== m) skip.add(m);
+    return skip;
+  }
+
+  _isSuperseded(m) {
+    if (!this.latestWins || m.key == null) return false;
+    const seen = this._newest.get(m.key);
+    return seen !== undefined && seen > m.offset;          // a newer message of this key was already handled: an older one (a redelivery, a backlog) must not undo it
+  }
+
+  _remember(m) {
+    if (!this.latestWins || m.key == null) return;
+    const seen = this._newest.get(m.key);
+    this._newest.delete(m.key);                            // re-insert: Map order is the recency order
+    this._newest.set(m.key, seen === undefined ? m.offset : Math.max(seen, m.offset));
+    if (this._newest.size > this.latestWinsKeys) this._newest.delete(this._newest.keys().next().value);
+  }
+
+  /** Runs fn after everything queued before it for the same key has finished (whether it succeeded or not). */
+  _serial(k, fn) {
+    const tail = this._tails.get(k) || Promise.resolve();
+    const run = tail.then(fn);
+    const end = run.then(() => {}, () => {});
+    this._tails.set(k, end);
+    end.then(() => { if (this._tails.get(k) === end) this._tails.delete(k); });
+    return run;
+  }
+
+  _process(m, skip = false) {
     const entry = { message: m, running: true };
     this.inFlight.set(key(m), entry);
-    Promise.resolve().then(() => this.handler(m)).then(
+    const work = () => {
+      if (skip || this._isSuperseded(m)) { this.stats.superseded++; return undefined; }
+      return Promise.resolve().then(() => this.handler(m)).then(r => { if (r !== RELEASE) this._remember(m); return r; });
+    };
+    const exec = this.order === 'key' && m.key != null ? this._serial(m.key, work) : Promise.resolve().then(work);
+    exec.then(
       result => {
         entry.running = false;
         if (result === RELEASE) return this._release([m]);

@@ -186,3 +186,91 @@ test('crash() abandons running messages without settling them, like a dead proce
   assert.equal(f.state.calls.filter(c => c.url.endsWith('/claim')).length, claimsBefore, 'and claims nothing more');
   await f.close();
 });
+
+// ---------------------------------------------------------------- order: 'key' and latestWins
+
+const msg = (f, n, key, extra = {}) => f.state.queue.push({ partition: 0, offset: f.state.nextOffset++, attempt: 1, timestamp: 1, key, value: JSON.stringify({ n }), ...extra });
+
+test("order 'key' runs one key at a time in arrival order but different keys in parallel", async () => {
+  const f = await fakeServer();
+  for (let i = 0; i < 4; i++) { msg(f, i, 'a'); msg(f, 10 + i, 'b'); }
+  const ember = new Ember({ baseUrl: f.base, apiKey: 'emb_test' });
+  const log = []; let activeByKey = {}; let maxPerKey = 0; let active = 0; let maxActive = 0;
+  const w = ember.worker('q', async m => {
+    const k = m.key; activeByKey[k] = (activeByKey[k] || 0) + 1; maxPerKey = Math.max(maxPerKey, activeByKey[k]);
+    active++; maxActive = Math.max(maxActive, active);
+    await new Promise(r => setTimeout(r, 15));
+    log.push(k + m.json().n); active--; activeByKey[k]--;
+  }, { concurrency: 8, waitMs: 20, order: 'key' }).start();
+  await until(() => f.state.acked.length === 8);
+  await w.stop();
+  assert.equal(maxPerKey, 1, 'never two messages of the same key at once');
+  assert.ok(maxActive >= 2, 'different keys overlapped');
+  assert.deepEqual(log.filter(x => x[0] === 'a'), ['a0', 'a1', 'a2', 'a3']);
+  assert.deepEqual(log.filter(x => x[0] === 'b'), ['b10', 'b11', 'b12', 'b13']);
+  await f.close();
+});
+
+test("order 'key': a failing message does not block the next one of its key", async () => {
+  const f = await fakeServer();
+  msg(f, 1, 'a'); msg(f, 2, 'a'); msg(f, 3, 'a');
+  const ember = new Ember({ baseUrl: f.base, apiKey: 'emb_test' });
+  const seen = [];
+  const w = ember.worker('q', async m => { seen.push(m.json().n); if (m.json().n === 2) throw new Error('boom'); }, { concurrency: 4, waitMs: 20, order: 'key' }).start();
+  await until(() => f.state.acked.length === 2 && f.state.nacked.length === 1);
+  await w.stop();
+  assert.deepEqual(seen, [1, 2, 3]);
+  await f.close();
+});
+
+test('latestWins handles only the newest message of a key in a batch and acks the rest unseen', async () => {
+  const f = await fakeServer();
+  for (let i = 0; i < 5; i++) msg(f, i, 'driver-1');
+  msg(f, 100, 'driver-2');
+  msg(f, 7, null);
+  const ember = new Ember({ baseUrl: f.base, apiKey: 'emb_test' });
+  const seen = [];
+  const w = ember.worker('q', async m => { seen.push(m.json().n); }, { concurrency: 10, waitMs: 20, latestWins: true }).start();
+  await until(() => f.state.acked.length === 7);
+  await w.stop();
+  assert.deepEqual(seen.sort((x, y) => x - y), [4, 7, 100]);
+  assert.equal(w.stats.superseded, 4);
+  assert.equal(f.state.nacked.length, 0);
+  await f.close();
+});
+
+test('latestWins does not let an older redelivery undo a newer message that was already handled', async () => {
+  const f = await fakeServer();
+  msg(f, 9, 'k', { offset: 50 });
+  const ember = new Ember({ baseUrl: f.base, apiKey: 'emb_test' });
+  const seen = [];
+  const w = ember.worker('q', async m => { seen.push(m.json().n); }, { concurrency: 4, waitMs: 20, latestWins: true }).start();
+  await until(() => seen.length === 1);
+  msg(f, 3, 'k', { offset: 40, attempt: 2 });                 // an older message arrives late
+  msg(f, 10, 'k', { offset: 60 });                            // a newer one still goes through
+  await until(() => f.state.acked.length === 3);
+  await w.stop();
+  assert.deepEqual(seen, [9, 10]);
+  assert.equal(w.stats.superseded, 1);
+  await f.close();
+});
+
+test('latestWins: a failed newest message is retried, not mistaken for an already handled one', async () => {
+  const f = await fakeServer();
+  msg(f, 1, 'k', { offset: 5 });
+  const ember = new Ember({ baseUrl: f.base, apiKey: 'emb_test' });
+  let calls = 0;
+  const w = ember.worker('q', async () => { if (++calls === 1) throw new Error('first try fails'); }, { concurrency: 2, waitMs: 20, latestWins: true }).start();
+  await until(() => f.state.nacked.length === 1);
+  msg(f, 1, 'k', { offset: 5, attempt: 2 });                  // the queue redelivers it
+  await until(() => f.state.acked.length === 1);
+  await w.stop();
+  assert.equal(calls, 2);
+  assert.equal(w.stats.superseded, 0);
+  await f.close();
+});
+
+test('order must be none or key', () => {
+  const ember = new Ember({ baseUrl: 'http://127.0.0.1:1', apiKey: 'emb_test' });
+  assert.throws(() => ember.worker('q', async () => {}, { order: 'fifo' }), TypeError);
+});
