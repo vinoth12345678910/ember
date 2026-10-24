@@ -170,3 +170,19 @@ test('under load the worker claims in batches, not one message per freed slot', 
   assert.ok(small <= 6, `only the start and the end may claim fewer than 10 at a time, got ${small} of ${claims.length}: ${claims.slice(0, 20)}`);
   await f.close();
 });
+
+test('crash() abandons running messages without settling them, like a dead process', async () => {
+  const f = await fakeServer();
+  f.add(3);
+  const ember = new Ember({ baseUrl: f.base, apiKey: 'emb_test' });
+  const started = [];
+  const w = ember.worker('q', async m => { started.push(m.offset); await new Promise(r => setTimeout(r, 150)); }, { concurrency: 3, waitMs: 50, ackDelayMs: 5 }).start();
+  await until(() => started.length === 3);
+  w.crash();
+  await new Promise(r => setTimeout(r, 400));                  // the handlers finish, but a crashed worker settles nothing
+  assert.equal(f.state.acked.length + f.state.nacked.length + f.state.released.length, 0);
+  const claimsBefore = f.state.calls.filter(c => c.url.endsWith('/claim')).length;
+  await new Promise(r => setTimeout(r, 200));
+  assert.equal(f.state.calls.filter(c => c.url.endsWith('/claim')).length, claimsBefore, 'and claims nothing more');
+  await f.close();
+});

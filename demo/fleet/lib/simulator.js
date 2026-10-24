@@ -59,6 +59,12 @@ class Simulator {
     while ((this._trips > 0 || [...this.rides.values()].some(r => r.outcome === 'pending')) && Date.now() - t0 < timeoutMs) await new Promise(r => setTimeout(r, 100));
   }
 
+  /** For long-running use: forget rides that finished more than ageMs ago so memory stays flat. */
+  prune(ageMs = 120000) {
+    const cutoff = Date.now() - ageMs;
+    for (const [id, r] of this.rides) if (r.outcome !== 'pending' && r.outcome !== 'matched' && r.requestedAt < cutoff) this.rides.delete(id);
+  }
+
   async stop() {
     this.stopLoad();
     this._stopped = true;

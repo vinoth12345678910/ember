@@ -58,6 +58,8 @@ export class Worker {
   stats: { claimed: number; acked: number; nacked: number; released: number; rejected: number };
   start(): this;
   stop(): Promise<void>;
+  /** Chaos helper: act like a dead process (settle nothing; claimed messages come back when their lease runs out). */
+  crash(): void;
 }
 
 export const RELEASE: unique symbol;

@@ -43,6 +43,8 @@ public final class EmberCli {
               queue-dead-retry|queue-dead-discard --subscription=s (--all | --partition=P --offset=N)
               queue-describe --subscription=s
               queue-bench    --subscription=s [--workers=4] [--claim=100] [--records=N (stop after N acked)] [--hold-ms=0 (simulated work per message batch)] [--poison-every=N (every Nth message always fails)]
+              compare-bench [--records=3000] [--partitions=6] [--poison-every=100] [--work-ms=20] [--seconds=30] [--queue-workers=24] [--json=FILE]
+                           (the same poisoned workload through a consumer group and through an ack queue, side by side)
               metadata     [--topic=t]
               bench        [--topic=t] [--partitions=3] [--producers=1] [--records=200000] [--value-bytes=100] [--batch=500]
                            [--warmup-records=0] [--rate=N records/s total (fixed-rate mode; default closed loop)] [--csv=FILE] [--acks-timeout=MS]
@@ -109,6 +111,15 @@ public final class EmberCli {
                     GroupCli.run(args[1], cfg, flags, out);
                 }
                 case "consume-bench" -> GroupCli.consumeBench(cfg, flags, out);
+                case "compare-bench" -> {
+                    try {
+                        CompareCli.run(cfg, flags, out);
+                    } catch (IOException | RuntimeException e) {
+                        throw e;
+                    } catch (Exception e) {
+                        throw new IOException(e);
+                    }
+                }
                 case "queue-create", "queue-describe", "queue-bench", "queue-dead", "queue-dead-retry", "queue-dead-discard" -> QueueCli.run(args[0], cfg, flags, out);
                 case "cluster" -> ClusterCli.run(args[1], flags, out);
                 case "healthcheck" -> {

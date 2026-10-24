@@ -48,6 +48,7 @@ final class WebServer implements AutoCloseable {
 
     private final UserStore users;
     private final AppStore apps;
+    private final FleetProxy fleet;
     private final Tokens tokens;
     private final BrokerGateway gateway;
     private final Clock clock;
@@ -63,6 +64,11 @@ final class WebServer implements AutoCloseable {
     }
 
     WebServer(String host, int port, UserStore users, AppStore apps, Tokens tokens, BrokerGateway gateway, Clock clock) throws IOException {
+        this(host, port, users, apps, tokens, gateway, clock, new FleetProxy(null));
+    }
+
+    WebServer(String host, int port, UserStore users, AppStore apps, Tokens tokens, BrokerGateway gateway, Clock clock, FleetProxy fleet) throws IOException {
+        this.fleet = fleet;
         this.users = users;
         this.apps = apps;
         this.tokens = tokens;
@@ -195,6 +201,7 @@ final class WebServer implements AutoCloseable {
             if (path.equals("/api/admin/cluster") && method.equals("GET")) return Json.obj("nodes", gateway.nodes(), "producer", gateway.producerStats());
             if (path.equals("/api/admin/topics") && method.equals("POST")) return createTopic(body(ex));
             if (path.equals("/api/admin/users") && method.equals("GET")) return Json.obj("users", users.list().stream().map(UserStore.User::view).toList());
+            if (path.startsWith("/api/admin/fleet/")) return fleet(path, method, ex);
             if (path.equals("/api/admin/queues") && method.equals("GET")) return Json.obj("queues", gateway.queues());
             if (path.equals("/api/admin/queues") && method.equals("POST")) return createQueue(body(ex));
             Matcher qd = QUEUE_DEAD.matcher(path);
@@ -369,6 +376,24 @@ final class WebServer implements AutoCloseable {
             throw new ApiException(409, "you cannot change your own role or disable yourself");
         }
         return Json.obj("user", users.update(name, role, disabled).view());
+    }
+
+    /** The Live Fleet page's calls, forwarded to the Fleet demo process. */
+    private Object fleet(String path, String method, HttpExchange ex) throws IOException {
+        FleetProxy.Result r;
+        if (path.equals("/api/admin/fleet/state") && method.equals("GET")) r = fleet.get("/state");
+        else if (path.equals("/api/admin/fleet/compare") && method.equals("GET")) r = fleet.get("/compare");
+        else if (path.equals("/api/admin/fleet/control") && method.equals("POST")) r = fleet.post("/control", Json.write(body(ex)));
+        else if (path.equals("/api/admin/fleet/compare/run") && method.equals("POST")) r = fleet.post("/compare/run", "{}");
+        else throw new ApiException(404, "no such endpoint");
+        Object parsed;
+        try {
+            parsed = Json.parse(r.body());
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(502, "the Fleet demo answered with something unexpected");
+        }
+        if (r.status() >= 400) throw new ApiException(r.status(), parsed instanceof Map<?, ?> m && m.get("error") != null ? String.valueOf(m.get("error")) : "the Fleet demo refused the request");
+        return parsed;
     }
 
     private Object createQueue(Map<String, Object> b) throws IOException {
