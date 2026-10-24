@@ -1,2 +1,4 @@
 .keys.json
 *.log
+results/compare.json
+results/*.tmp

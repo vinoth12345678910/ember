@@ -192,6 +192,20 @@ class Worker {
     await this._settleChain;
   }
 
+  /**
+   * Chaos/testing helper: behaves like a process that died. Claims nothing more and settles nothing (no ack, no nack, no release), so its running
+   * messages stay claimed until their lease runs out and are then redelivered to another worker.
+   */
+  crash() {
+    this._crashed = true;
+    this._stopping = true;
+    this._abort.abort();
+    clearInterval(this._extender);
+    clearTimeout(this._ackTimer);
+    this._acks.length = 0;
+    this._wakeSlots();
+  }
+
   get _running() { return [...this.inFlight.values()].filter(e => e.running).length; }
 
   _free() { return this.concurrency - this.inFlight.size; }
@@ -249,6 +263,7 @@ class Worker {
   }
 
   _queueAck(m) {
+    if (this._crashed) return;
     this._acks.push(m);
     if (this._acks.length >= 200) return void this._flushAcks();
     if (!this._ackTimer) this._ackTimer = setTimeout(() => this._flushAcks(), this.ackDelayMs);
@@ -264,12 +279,14 @@ class Worker {
   }
 
   async _release(messages) {
+    if (this._crashed) return;
     const r = await this._settle('release', messages);
     this.stats.released += r.settled;
   }
 
   /** Settles messages (serialised so a late ack cannot overtake a nack of the same message) and forgets them. */
   _settle(op, messages, reason) {
+    if (this._crashed) return Promise.resolve({ settled: 0, rejected: 0 });
     const run = async () => {
       try {
         const r = op === 'nack' ? await this.ember.nack(this.queue, messages, reason, this.name)

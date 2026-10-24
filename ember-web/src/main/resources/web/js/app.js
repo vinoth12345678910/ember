@@ -73,6 +73,7 @@ const routes = [
   [/^\/admin\/topics$/, shellPage('admin', 'admintopics', adminTopics, true)],
   [/^\/admin\/users$/, shellPage('admin', 'users', adminUsers, true)],
   [/^\/admin\/apps$/, shellPage('admin', 'apps', adminApps, true)],
+  [/^\/admin\/fleet$/, shellPage('admin', 'fleet', adminFleet, true)],
   [/^\/admin\/queues$/, shellPage('admin', 'queues', adminQueues, true)],
   [/^\/admin\/queues\/(.+)$/, shellPage('admin', 'queues', adminDead, true)],
 ];
@@ -121,6 +122,7 @@ function shellPage(area, key, render, adminOnly = false) {
         ${isAdmin() ? `<div class="group">Administration</div>
           ${nav('#/admin', 'overview', '♥', 'Cluster health')}
           ${nav('#/admin/topics', 'admintopics', '＋', 'Manage topics')}
+          ${nav('#/admin/fleet', 'fleet', '◎', 'Live Fleet')}
           ${nav('#/admin/queues', 'queues', '⇄', 'Queues')}
           ${nav('#/admin/apps', 'apps', '⬡', 'Apps')}
           ${nav('#/admin/users', 'users', '☺', 'Users')}` : ''}
@@ -706,6 +708,156 @@ async function adminDead(view, [queue], _p, alive) {
       await paint();
     } catch (err) { toast(err.message, true); }
   });
+}
+
+// ---------------------------------------------------------------- Live Fleet
+
+const fmt = n => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
+
+async function adminFleet(view, _a, _p, alive) {
+  let state = null, cmp = null, cmpTimer = 0;
+  const q = id => $('#' + id, view);
+
+  const notRunning = msg => {
+    view.innerHTML = head('Live Fleet', 'A ride-dispatch system running on Ember, with thousands of simulated drivers.') +
+      `<div class="panel"><div class="body"><div class="empty"><b>${esc(msg || 'The Fleet demo is not running')}</b>
+      Start it next to the console, then this page fills in on its own:<br><br>
+      <code>cd demo/fleet &amp;&amp; node bin/setup.js &amp;&amp; node bin/live.js --drivers 2000</code></div></div></div>`;
+    state = null;
+  };
+
+  const skeleton = () => {
+    view.innerHTML = head('Live Fleet', 'Simulated drivers and riders, a dispatcher, billing against a flaky bank. Break things and watch Ember cope.',
+      `<span class="badge ok" id="f-status"><span class="dot"></span>running</span>`) + `
+      <div class="kpis" id="f-kpis"></div>
+      <div class="fleet-grid">
+        <div class="panel"><header><h2>Live map</h2><span class="hint"><span class="legend idle"></span> idle <span class="legend busy"></span> on a trip · <span id="f-dots"></span></span></header>
+          <div class="body" style="padding:10px"><canvas id="f-map" class="fleet-map" aria-label="Map of simulated drivers"></canvas></div></div>
+        <div>
+          <div class="panel"><header><h2>Pipeline</h2><a href="#/admin/queues">All queues</a></header><div class="table-wrap"><table id="f-queues"></table></div></div>
+          <div class="panel"><header><h2>Break things</h2><span class="badge" id="f-bank"></span></header><div class="body">
+            <div class="fleet-actions">
+              <button class="btn" id="f-bankbtn"></button>
+              <button class="btn" data-crash="billing">Crash billing (10 s)</button>
+              <button class="btn" data-crash="matcher">Crash matcher (10 s)</button>
+              <button class="btn" data-crash="notifier">Crash notifier (10 s)</button>
+            </div>
+            <div class="field" style="margin:14px 0 0"><label for="f-riders">Ride requests per second: <b id="f-riders-v"></b></label><input type="range" id="f-riders" min="0" max="60" step="1"></div>
+            <p class="hint" style="margin:12px 0 0">Try it: take the bank down, watch billing's <i>retrying</i> climb, then dead letters appear. Bring the bank back and use <a href="#/admin/queues/billing">Dead letters</a> to retry them all: no ride is charged twice.</p>
+          </div></div>
+        </div>
+      </div>
+      <div class="panel"><header><h2>Why per-message tracking matters</h2><div class="row-actions"><span class="hint" id="f-cmp-note"></span><button class="btn sm primary" id="f-cmp-run">Run it now (about a minute)</button></div></header>
+        <div class="body" id="f-cmp"></div></div>`;
+    q('f-bankbtn').onclick = () => control({ action: 'bank', down: !(state && state.bank.down) });
+    view.querySelectorAll('[data-crash]').forEach(b => b.onclick = () => control({ action: 'crash', service: b.dataset.crash, seconds: 10 }));
+    q('f-riders').onchange = e => control({ action: 'riders', perSec: Number(e.target.value) });
+    q('f-riders').oninput = e => { q('f-riders-v').textContent = e.target.value; };
+    q('f-cmp-run').onclick = async () => {
+      try { await api('/admin/fleet/compare/run', { method: 'POST', body: {} }); toast('Comparison started: about a minute'); pollCompare(); } catch (e) { toast(e.message, true); }
+    };
+  };
+
+  const control = async body => {
+    try { await api('/admin/fleet/control', { method: 'POST', body }); await tick(); } catch (e) { toast(e.message, true); }
+  };
+
+  const kpi = (label, value, sub) => `<div class="kpi"><span>${label}</span><b>${value}</b><small>${sub || '&nbsp;'}</small></div>`;
+
+  const paintMap = () => {
+    const c = q('f-map');
+    if (!c || !state) return;
+    const w = c.clientWidth, h = Math.round(w * 0.72), dpr = window.devicePixelRatio || 1;
+    c.width = w * dpr; c.height = h * dpr; c.style.height = h + 'px';
+    const g = c.getContext('2d');
+    g.scale(dpr, dpr);
+    const css = getComputedStyle(document.documentElement);
+    g.fillStyle = css.getPropertyValue('--bg-2').trim() || '#eee'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = css.getPropertyValue('--line').trim() || '#ddd'; g.lineWidth = 1;
+    for (let i = 1; i < 8; i++) { g.beginPath(); g.moveTo(w * i / 8, 0); g.lineTo(w * i / 8, h); g.moveTo(0, h * i / 8); g.lineTo(w, h * i / 8); g.stroke(); }
+    const b = state.city;
+    const idle = '#7d8aa3', busy = css.getPropertyValue('--accent').trim() || '#e8590c';
+    for (const pass of [0, 1]) {                                   // idle dots first, trips on top
+      g.fillStyle = pass ? busy : idle;
+      for (const [lat, lng, isBusy] of state.drivers) {
+        if (isBusy !== pass) continue;
+        const x = (lng - b.minLng) / (b.maxLng - b.minLng) * w, y = (1 - (lat - b.minLat) / (b.maxLat - b.minLat)) * h;
+        g.globalAlpha = pass ? 1 : 0.75;
+        g.beginPath(); g.arc(x, y, pass ? 3.2 : 2, 0, 6.2832); g.fill();
+      }
+    }
+    g.globalAlpha = 1;
+  };
+
+  const paint = () => {
+    const s = state;
+    const down = n => !s.services[n];
+    q('f-status').className = 'badge ' + (s.bank.down ? 'warn' : 'ok');
+    q('f-status').innerHTML = `<span class="dot"></span>${s.bank.down ? 'bank outage' : 'all healthy'} · up ${esc(uptime(s.uptimeSec))}`;
+    q('f-kpis').innerHTML = kpi('Drivers', fmt(s.config.drivers), `${fmt(s.trackedDrivers)} tracked`) + kpi('GPS pings / s', fmt(s.rates.pings), `${fmt(s.totals.pings)} total`) +
+      kpi('Rides matched / s', fmt(s.rates.matched), `${fmt(s.totals.matched)} matched · ${fmt(s.totals.unmatched)} unmatched`) +
+      kpi('Request → match', s.latency.count ? `${fmt(s.latency.p50)} ms` : '—', s.latency.count ? `p99 ${fmt(s.latency.p99)} ms` : 'waiting for rides') +
+      kpi('Rides charged', fmt(s.totals.charged), `${fmt(s.totals.completed)} completed`);
+    q('f-dots').textContent = `${fmt(s.drivers.length)} of ${fmt(s.config.drivers)} drivers shown`;
+    const rows = ['tracker', 'matcher', 'sim-events', 'billing', 'notifier'].map(n => {
+      const x = s.queues[n], svc = s.services[n];
+      return `<tr><td class="mono">${n}${svc === false ? ' <span class="badge bad">crashed</span>' : ''}</td>${x ? `<td class="num">${fmt(x.waiting)}</td><td class="num">${fmt(x.inFlight)}</td>
+        <td class="num">${x.retrying ? `<span class="badge warn">${fmt(x.retrying)}</span>` : '0'}</td><td class="num">${x.dead ? `<span class="badge bad">${fmt(x.dead)}</span>` : '0'}</td>` : '<td colspan="4" class="hint">no data</td>'}</tr>`;
+    }).join('');
+    q('f-queues').innerHTML = `<thead><tr><th>Queue</th><th class="num">Waiting</th><th class="num">In flight</th><th class="num">Retrying</th><th class="num">Dead</th></tr></thead><tbody>${rows}</tbody>`;
+    q('f-bank').className = 'badge ' + (s.bank.down ? 'bad' : 'ok');
+    q('f-bank').textContent = s.bank.down ? 'bank DOWN' : 'bank up';
+    q('f-bankbtn').textContent = s.bank.down ? 'Bring the bank back' : 'Take the bank down';
+    q('f-bankbtn').className = 'btn ' + (s.bank.down ? 'primary' : 'danger');
+    view.querySelectorAll('[data-crash]').forEach(b => { b.disabled = down(b.dataset.crash); });
+    if (document.activeElement !== q('f-riders')) { q('f-riders').value = s.config.ridersPerSec; q('f-riders-v').textContent = s.config.ridersPerSec; }
+    paintMap();
+  };
+
+  const paintCompare = () => {
+    const el = q('f-cmp');
+    if (!el) return;
+    const r = cmp && cmp.result;
+    q('f-cmp-run').disabled = !cmp || !cmp.available || cmp.running;
+    q('f-cmp-run').textContent = cmp && cmp.running ? 'Running… (about a minute)' : 'Run it now (about a minute)';
+    q('f-cmp-note').textContent = cmp && !cmp.available ? 'to run it here, start live.js with EMBER_CLIENT_JAR set' : (r && r.sample ? 'showing a saved result' : r ? 'result from this machine' : '');
+    if (!r) { el.innerHTML = `<div class="empty"><b>No comparison result yet</b>Run it to see the same poisoned workload consumed four ways.</div>`; return; }
+    const poison = r.rows[0].poisonTotal;
+    el.innerHTML = `<p style="margin:0 0 14px;color:var(--muted)">The same topic: ${fmt(r.records)} messages on ${r.partitions} partitions, every ${r.poisonEvery}th one is <b>poison</b> (${fmt(poison)} messages that always fail), ${r.workMs} ms of work per message.
+      A consumer group tracks one position per partition; an ack queue tracks every message.</p>` +
+      r.rows.map(x => {
+        const share = Math.round(100 * x.healthyProcessed / x.healthyTotal), good = share >= 100;
+        return `<div class="cmp-row"><div class="cmp-label"><b>${esc(x.label)}</b><span class="hint">${x.workers} workers</span></div>
+          <div class="cmp-bar"><div class="cmp-fill ${good ? 'ok' : 'bad'}" style="width:${share}%"></div><span>${fmt(x.healthyProcessed)} / ${fmt(x.healthyTotal)} healthy messages done</span></div>
+          <div class="cmp-time">${x.finished ? (x.elapsedMs / 1000).toFixed(1) + ' s' : `<span class="badge bad">stuck after ${(x.elapsedMs / 1000).toFixed(0)} s</span>`}</div>
+          <div class="cmp-out hint">${esc(x.poisonOutcome)}</div></div>`;
+      }).join('') +
+      `<p class="hint" style="margin:12px 0 0">Teams that need retries and a dead-letter queue on a consumer group build them by hand (extra topics and consumers). Here they are part of the queue.</p>`;
+  };
+
+  const tick = async () => {
+    try {
+      const s = await api('/admin/fleet/state');
+      if (!alive()) return;
+      if (!state) skeleton();
+      state = s;
+      paint();
+    } catch (e) {
+      if (!alive() || e.message === 'signed out') return;
+      notRunning(e.message);
+    }
+  };
+  const pollCompare = async () => {
+    try { cmp = await api('/admin/fleet/compare'); } catch { cmp = null; }
+    if (!alive() || !q('f-cmp')) return;
+    paintCompare();
+    clearTimeout(cmpTimer);
+    if (cmp && cmp.running) cmpTimer = setTimeout(pollCompare, 3000);
+  };
+
+  await tick();
+  if (state) await pollCompare();
+  refreshEvery(1000, alive, async () => { const wasDown = !state; await tick(); if (wasDown && state) pollCompare(); });
 }
 
 navigate();
