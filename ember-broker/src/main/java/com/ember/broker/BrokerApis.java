@@ -291,7 +291,7 @@ public class BrokerApis {
 
     public Outcome<QueueCreateResponse> handleQueueCreate(QueueCreateRequest r) {
         waitForAckLeaderIfAlone();
-        var result = replicas.ackCoordinator().create(r.subscription(), r.topic(), r.fromStart(), r.leaseMs());
+        var result = replicas.ackCoordinator().create(r.subscription(), r.topic(), r.fromStart(), r.leaseMs(), r.maxAttempts(), r.backoffBaseMs(), r.backoffMaxMs());
         return result.error() == ErrorCode.NONE ? Outcome.ok(new QueueCreateResponse(result.partitions())) : Outcome.error(result.error());
     }
 
@@ -302,13 +302,25 @@ public class BrokerApis {
     }
 
     public Outcome<QueueSettleResponse> handleQueueSettle(QueueSettleRequest r) {
-        byte type = switch (r.apiKey()) {
-            case QUEUE_ACK -> com.ember.replication.AckCommands.ACK;
-            case QUEUE_RELEASE -> com.ember.replication.AckCommands.RELEASE;
-            default -> com.ember.replication.AckCommands.EXTEND;
+        var coordinator = replicas.ackCoordinator();
+        var result = switch (r.apiKey()) {
+            case QUEUE_ACK -> coordinator.settle(com.ember.replication.AckCommands.ACK, r.subscription(), r.worker(), r.leaseMs(), r.handles());
+            case QUEUE_RELEASE -> coordinator.settle(com.ember.replication.AckCommands.RELEASE, r.subscription(), r.worker(), r.leaseMs(), r.handles());
+            case QUEUE_EXTEND -> coordinator.settle(com.ember.replication.AckCommands.EXTEND, r.subscription(), r.worker(), r.leaseMs(), r.handles());
+            case QUEUE_DEAD_RETRY -> coordinator.deadAction(com.ember.replication.AckCommands.DEAD_RETRY, r.subscription(), r.handles());
+            default -> coordinator.deadAction(com.ember.replication.AckCommands.DEAD_DISCARD, r.subscription(), r.handles());
         };
-        var result = replicas.ackCoordinator().settle(type, r.subscription(), r.worker(), r.leaseMs(), r.handles());
         return result.error() == ErrorCode.NONE ? Outcome.ok(new QueueSettleResponse(result.settled(), result.rejected())) : Outcome.error(result.error());
+    }
+
+    public Outcome<QueueSettleResponse> handleQueueNack(QueueNackRequest r) {
+        var result = replicas.ackCoordinator().nack(r.subscription(), r.worker(), r.reason(), r.handles());
+        return result.error() == ErrorCode.NONE ? Outcome.ok(new QueueSettleResponse(result.settled(), result.rejected())) : Outcome.error(result.error());
+    }
+
+    public Outcome<QueueDeadListResponse> handleQueueDeadList(QueueDeadListRequest r) {
+        var result = replicas.ackCoordinator().deadList(r.subscription(), r.maxItems());
+        return result.error() == ErrorCode.NONE ? Outcome.ok(new QueueDeadListResponse(result.total(), result.items())) : Outcome.error(result.error());
     }
 
     public Outcome<QueueDescribeResponse> handleQueueDescribe(QueueDescribeRequest r) {

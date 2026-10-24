@@ -15,7 +15,8 @@ import java.util.List;
  * The leader decides everything non-deterministic (which offsets, the deadline, the clock reading) BEFORE proposing; the codec
  * and the state machine are pure.
  *
- *   CREATE   [1][STRING sub][STRING topic][INT32 leaseMs][INT32 n]([INT64 start])*          one start offset per partition
+ *   CREATE   [1][STRING sub][STRING topic][INT32 leaseMs][INT32 n]([INT64 start])* [INT32 maxAttempts][INT32 backoffBaseMs][INT32 backoffMaxMs]
+ *            one start offset per partition; the three trailing policy ints are optional (older logs: defaults 5 / 1000 / 60000)
  *   CLAIM    [2][STRING sub][INT32 n]( [INT32 partition][STRING worker][INT64 deadline][INT64 freshFrom][INT32 freshCount]
  *                                      [INT32 m]([INT64 offset])* )*
  *   ACK      [3][STRING sub][STRING worker][INT64 0][INT32 n]([INT32 partition][INT64 offset][INT32 attempt])*
@@ -23,6 +24,8 @@ import java.util.List;
  *   EXTEND   [5]  same layout as ACK, the INT64 is the new deadline
  *   EXPIRE   [6][STRING sub][INT64 now][INT32 n]([INT32 partition][INT64 offset][INT32 attempt])*
  *   DELETE   [7][STRING sub]
+ *   NACK     [8][STRING sub][STRING worker][INT64 now][STRING reason][INT32 n]([INT32 partition][INT64 offset][INT32 attempt])*
+ *   DEAD_RETRY / DEAD_DISCARD  [9|10][STRING sub][INT32 n]([INT32 partition][INT64 offset])*
  */
 public final class AckCommands {
 
@@ -33,12 +36,37 @@ public final class AckCommands {
     public static final byte EXTEND = 5;
     public static final byte EXPIRE = 6;
     public static final byte DELETE = 7;
+    public static final byte NACK = 8;
+    public static final byte DEAD_RETRY = 9;
+    public static final byte DEAD_DISCARD = 10;
+
+    public static final int DEFAULT_MAX_ATTEMPTS = 5;
+    public static final int DEFAULT_BACKOFF_BASE_MS = 1_000;
+    public static final int DEFAULT_BACKOFF_MAX_MS = 60_000;
 
     static final int MAX_LIST = 100_000;
 
-    public record Create(String subscription, String topic, int leaseMs, List<Long> starts) {
+    public record Create(String subscription, String topic, int leaseMs, List<Long> starts, int maxAttempts, int backoffBaseMs, int backoffMaxMs) {
         public Create {
             starts = List.copyOf(starts);
+        }
+
+        public Create(String subscription, String topic, int leaseMs, List<Long> starts) {
+            this(subscription, topic, leaseMs, starts, DEFAULT_MAX_ATTEMPTS, DEFAULT_BACKOFF_BASE_MS, DEFAULT_BACKOFF_MAX_MS);
+        }
+    }
+
+    /** A failed delivery: retry after a backoff computed from now, or dead-letter when the attempts are used up. */
+    public record Nack(String subscription, String worker, long now, String reason, List<QueueHandle> handles) {
+        public Nack {
+            handles = List.copyOf(handles);
+        }
+    }
+
+    /** Admin action on dead-lettered messages: type is DEAD_RETRY or DEAD_DISCARD; only partition and offset of each handle matter. */
+    public record DeadAction(byte type, String subscription, List<QueueHandle> handles) {
+        public DeadAction {
+            handles = List.copyOf(handles);
         }
     }
 
@@ -84,7 +112,7 @@ public final class AckCommands {
     // ------------------------------------------------------------------ encode
 
     public static byte[] encode(Create c) {
-        ByteBuffer buf = ByteBuffer.allocate(1 + strSize(c.subscription()) + strSize(c.topic()) + 4 + 4 + 8 * c.starts().size());
+        ByteBuffer buf = ByteBuffer.allocate(1 + strSize(c.subscription()) + strSize(c.topic()) + 4 + 4 + 8 * c.starts().size() + 12);
         buf.put(CREATE);
         putString(buf, c.subscription());
         putString(buf, c.topic());
@@ -92,6 +120,7 @@ public final class AckCommands {
         for (long s : c.starts()) {
             buf.putLong(s);
         }
+        buf.putInt(c.maxAttempts()).putInt(c.backoffBaseMs()).putInt(c.backoffMaxMs());
         return buf.array();
     }
 
@@ -141,6 +170,34 @@ public final class AckCommands {
         return buf.array();
     }
 
+    public static byte[] encode(Nack n) {
+        ByteBuffer buf = ByteBuffer.allocate(1 + strSize(n.subscription()) + strSize(n.worker()) + 8 + strSize(n.reason()) + 4 + 16 * n.handles().size());
+        buf.put(NACK);
+        putString(buf, n.subscription());
+        putString(buf, n.worker());
+        buf.putLong(n.now());
+        putString(buf, n.reason());
+        buf.putInt(n.handles().size());
+        for (QueueHandle h : n.handles()) {
+            buf.putInt(h.partition()).putLong(h.offset()).putInt(h.attempt());
+        }
+        return buf.array();
+    }
+
+    public static byte[] encode(DeadAction a) {
+        if (a.type() != DEAD_RETRY && a.type() != DEAD_DISCARD) {
+            throw new IllegalArgumentException("not a dead-letter action type: " + a.type());
+        }
+        ByteBuffer buf = ByteBuffer.allocate(1 + strSize(a.subscription()) + 4 + 12 * a.handles().size());
+        buf.put(a.type());
+        putString(buf, a.subscription());
+        buf.putInt(a.handles().size());
+        for (QueueHandle h : a.handles()) {
+            buf.putInt(h.partition()).putLong(h.offset());
+        }
+        return buf.array();
+    }
+
     public static byte[] encode(Delete d) {
         ByteBuffer buf = ByteBuffer.allocate(1 + strSize(d.subscription()));
         buf.put(DELETE);
@@ -160,8 +217,14 @@ public final class AckCommands {
         for (int i = 0; i < n; i++) {
             starts.add(getLong(buf));
         }
+        int maxAttempts = DEFAULT_MAX_ATTEMPTS, base = DEFAULT_BACKOFF_BASE_MS, max = DEFAULT_BACKOFF_MAX_MS;
+        if (buf.hasRemaining()) {                                   // logs written before the retry policy existed end here
+            maxAttempts = getInt(buf);
+            base = getInt(buf);
+            max = getInt(buf);
+        }
         end(buf);
-        return new Create(sub, topic, lease, starts);
+        return new Create(sub, topic, lease, starts, maxAttempts, base, max);
     }
 
     public static Claim decodeClaim(byte[] command) {
@@ -205,6 +268,31 @@ public final class AckCommands {
         List<QueueHandle> handles = getHandles(buf);
         end(buf);
         return new Expire(sub, now, handles);
+    }
+
+    public static Nack decodeNack(byte[] command) {
+        ByteBuffer buf = start(command, NACK);
+        String sub = getString(buf);
+        String worker = getString(buf);
+        long now = getLong(buf);
+        String reason = getString(buf);
+        List<QueueHandle> handles = getHandles(buf);
+        end(buf);
+        return new Nack(sub, worker, now, reason, handles);
+    }
+
+    public static DeadAction decodeDeadAction(byte[] command) {
+        byte type = command.length == 0 ? 0 : command[0];
+        require(type == DEAD_RETRY || type == DEAD_DISCARD, "wrong command type");
+        ByteBuffer buf = start(command, type);
+        String sub = getString(buf);
+        int n = getCount(buf, 12);
+        List<QueueHandle> handles = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            handles.add(new QueueHandle(getInt(buf), getLong(buf), 0));
+        }
+        end(buf);
+        return new DeadAction(type, sub, handles);
     }
 
     public static Delete decodeDelete(byte[] command) {

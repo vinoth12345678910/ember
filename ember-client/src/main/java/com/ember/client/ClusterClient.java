@@ -437,8 +437,17 @@ public final class ClusterClient implements Router {
         throw new IOException("ack queue leader unreachable after " + config.retries() + " retries: " + last, last);
     }
 
-    public synchronized int queueCreate(String subscription, String topic, boolean fromStart, int leaseMs) throws IOException {
-        return queueRoute(c -> c.queueCreate(subscription, topic, fromStart, leaseMs));
+    public synchronized int queueCreate(String subscription, String topic, boolean fromStart, int leaseMs, int maxAttempts, int backoffBaseMs,
+                                        int backoffMaxMs) throws IOException {
+        return queueRoute(c -> c.queueCreate(subscription, topic, fromStart, leaseMs, maxAttempts, backoffBaseMs, backoffMaxMs));
+    }
+
+    public synchronized QueueSettleResponse queueNack(String subscription, String worker, List<QueueHandle> handles, String reason) throws IOException {
+        return queueRoute(c -> c.queueNack(subscription, worker, handles, reason));
+    }
+
+    public synchronized QueueDeadListResponse queueDeadList(String subscription, int maxItems) throws IOException {
+        return queueRoute(c -> c.queueDeadList(subscription, maxItems));
     }
 
     public synchronized List<QueueMessage> queueClaim(String subscription, String worker, int maxMessages, int leaseMs, int maxBytes) throws IOException {

@@ -22,7 +22,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * Per partition: every offset below {@code floor} is finished; {@code done} holds finished offsets at or above the floor as ranges
  * (out-of-order acks); {@code next} is the first offset never handed out; {@code leases} are messages being processed; {@code redeliver}
- * are messages whose lease expired or were released (value = the attempt that last held them).
+ * are messages waiting to be handed out again (released, failed with a backoff still running, or whose lease expired); {@code dead}
+ * are messages that used up their attempts: they are NOT finished (they hold the floor) until an admin retries or discards them.
+ *
+ * Two counters per message: the ATTEMPT number identifies one delivery (it only grows; it is what fences stale acks) and the FAILURE
+ * count says how many deliveries failed (a nack or a lease that ran out; a release is not a failure). maxAttempts failures = dead.
  *
  * Readers (the coordinator, DESCRIBE, tests) may run on other threads: every public method is synchronized.
  */
@@ -34,7 +38,14 @@ public final class AckStateMachine implements StateMachine {
     public record SettleOutcome(int settled, int rejected) {
     }
 
-    record Lease(String worker, int attempt, long deadline) {
+    record Lease(String worker, int attempt, int failures, long deadline) {
+    }
+
+    /** A message waiting to be handed out again; due once the (leader-supplied) clock reaches notBefore. */
+    record Waiting(int attempt, int failures, long notBefore) {
+    }
+
+    record Dead(int attempt, int failures, long deadAt, String reason) {
     }
 
     private static final class PartitionQueue {
@@ -42,7 +53,8 @@ public final class AckStateMachine implements StateMachine {
         long next;
         final TreeMap<Long, Long> done = new TreeMap<>();            // start -> end (exclusive); ranges are disjoint, non-adjacent, all above floor
         final TreeMap<Long, Lease> leases = new TreeMap<>();
-        final TreeMap<Long, Integer> redeliver = new TreeMap<>();
+        final TreeMap<Long, Waiting> redeliver = new TreeMap<>();
+        final TreeMap<Long, Dead> dead = new TreeMap<>();
 
         PartitionQueue(long start) {
             floor = start;
@@ -94,11 +106,17 @@ public final class AckStateMachine implements StateMachine {
     private static final class Subscription {
         final String topic;
         final int leaseMs;
+        final int maxAttempts;
+        final int backoffBaseMs;
+        final int backoffMaxMs;
         final PartitionQueue[] partitions;
 
-        Subscription(String topic, int leaseMs, List<Long> starts) {
+        Subscription(String topic, int leaseMs, List<Long> starts, int maxAttempts, int backoffBaseMs, int backoffMaxMs) {
             this.topic = topic;
             this.leaseMs = leaseMs;
+            this.maxAttempts = maxAttempts;
+            this.backoffBaseMs = backoffBaseMs;
+            this.backoffMaxMs = backoffMaxMs;
             this.partitions = new PartitionQueue[starts.size()];
             for (int i = 0; i < partitions.length; i++) {
                 partitions[i] = new PartitionQueue(starts.get(i));
@@ -107,14 +125,19 @@ public final class AckStateMachine implements StateMachine {
     }
 
     /** An immutable snapshot of one partition's progress. */
-    public record PartitionView(int partition, long floor, long next, int inFlight, int redeliver, long doneAbove) {
+    public record PartitionView(int partition, long floor, long next, int inFlight, int redeliver, long doneAbove, int dead) {
     }
 
-    public record SubscriptionView(String name, String topic, int leaseMs, List<PartitionView> partitions) {
+    public record SubscriptionView(String name, String topic, int leaseMs, int maxAttempts, int backoffBaseMs, int backoffMaxMs,
+                                   List<PartitionView> partitions) {
     }
 
-    /** A message waiting to be handed out again, with the attempt that last held it. */
-    public record Redelivery(long offset, int attempts) {
+    /** A message that may be handed out again now, with the attempt that last held it and how many deliveries failed so far. */
+    public record Redelivery(long offset, int attempts, int failures) {
+    }
+
+    /** A dead-lettered message. */
+    public record DeadView(int partition, long offset, int attempts, int failures, long deadAt, String reason) {
     }
 
     private final Map<String, Subscription> subscriptions = new ConcurrentHashMap<>();
@@ -132,6 +155,8 @@ public final class AckStateMachine implements StateMachine {
                 case AckCommands.ACK, AckCommands.RELEASE, AckCommands.EXTEND -> settle(AckCommands.decodeSettle(command));
                 case AckCommands.EXPIRE -> expire(AckCommands.decodeExpire(command));
                 case AckCommands.DELETE -> delete(AckCommands.decodeDelete(command));
+                case AckCommands.NACK -> nack(AckCommands.decodeNack(command));
+                case AckCommands.DEAD_RETRY, AckCommands.DEAD_DISCARD -> deadAction(AckCommands.decodeDeadAction(command));
                 default -> throw new IllegalStateException("unknown __acks command type " + AckCommands.type(command));
             };
         } catch (IllegalArgumentException malformed) {
@@ -143,10 +168,11 @@ public final class AckStateMachine implements StateMachine {
         if (subscriptions.containsKey(c.subscription())) {
             return Result.ALREADY_EXISTS;
         }
-        if (c.leaseMs() < 1 || c.starts().isEmpty() || c.starts().stream().anyMatch(s -> s < 0)) {
+        if (c.leaseMs() < 1 || c.starts().isEmpty() || c.starts().stream().anyMatch(s -> s < 0)
+                || c.maxAttempts() < 1 || c.backoffBaseMs() < 0 || c.backoffMaxMs() < c.backoffBaseMs()) {
             return Result.INVALID;
         }
-        subscriptions.put(c.subscription(), new Subscription(c.topic(), c.leaseMs(), c.starts()));
+        subscriptions.put(c.subscription(), new Subscription(c.topic(), c.leaseMs(), c.starts(), c.maxAttempts(), c.backoffBaseMs(), c.backoffMaxMs()));
         return Result.OK;
     }
 
@@ -182,15 +208,15 @@ public final class AckStateMachine implements StateMachine {
             }
         }
         for (long o : a.redeliver()) {
-            int attempts = pq.redeliver.remove(o);
-            pq.leases.put(o, new Lease(a.worker(), attempts + 1, a.deadline()));
+            Waiting w = pq.redeliver.remove(o);
+            pq.leases.put(o, new Lease(a.worker(), w.attempt() + 1, w.failures(), a.deadline()));
         }
         if (a.freshCount() > 0) {
             if (a.freshFrom() > pq.next) {
                 pq.addDone(pq.next, a.freshFrom());                      // offsets the log no longer holds (retention): nothing to deliver
             }
             for (long o = a.freshFrom(); o < a.freshFrom() + a.freshCount(); o++) {
-                pq.leases.put(o, new Lease(a.worker(), 1, a.deadline()));
+                pq.leases.put(o, new Lease(a.worker(), 1, 0, a.deadline()));
             }
             pq.next = a.freshFrom() + a.freshCount();
         }
@@ -236,23 +262,24 @@ public final class AckStateMachine implements StateMachine {
             pq.addDone(h.offset(), h.offset() + 1);
             return true;
         }
-        Integer waiting = pq.redeliver.get(h.offset());                 // lease expired but nobody took it yet: the work WAS done
-        if (waiting != null && waiting == h.attempt()) {
+        Waiting waiting = pq.redeliver.get(h.offset());                 // lease expired but nobody took it yet: the work WAS done
+        if (waiting != null && waiting.attempt() == h.attempt()) {
             pq.redeliver.remove(h.offset());
             pq.addDone(h.offset(), h.offset() + 1);
             return true;
         }
-        return false;                                                   // fenced: another attempt owns it
+        return false;                                                   // fenced: another attempt owns it (or it is dead-lettered)
     }
 
     private boolean release(PartitionQueue pq, String worker, QueueHandle h) {
-        if (holds(pq.leases.get(h.offset()), worker, h.attempt())) {
+        Lease l = pq.leases.get(h.offset());
+        if (holds(l, worker, h.attempt())) {
             pq.leases.remove(h.offset());
-            pq.redeliver.put(h.offset(), h.attempt());
+            pq.redeliver.put(h.offset(), new Waiting(h.attempt(), l.failures(), 0));      // a release is not a failure
             return true;
         }
-        Integer waiting = pq.redeliver.get(h.offset());
-        return waiting != null && waiting == h.attempt();               // already released: idempotent
+        Waiting waiting = pq.redeliver.get(h.offset());
+        return waiting != null && waiting.attempt() == h.attempt();     // already released: idempotent
     }
 
     private boolean extend(PartitionQueue pq, String worker, QueueHandle h, long deadline) {
@@ -261,7 +288,7 @@ public final class AckStateMachine implements StateMachine {
             return false;
         }
         if (deadline > l.deadline()) {
-            pq.leases.put(h.offset(), new Lease(l.worker(), l.attempt(), deadline));
+            pq.leases.put(h.offset(), new Lease(l.worker(), l.attempt(), l.failures(), deadline));
         }
         return true;
     }
@@ -277,13 +304,83 @@ public final class AckStateMachine implements StateMachine {
             Lease l = pq == null ? null : pq.leases.get(h.offset());
             if (l != null && l.attempt() == h.attempt() && l.deadline() <= e.now()) {
                 pq.leases.remove(h.offset());
-                pq.redeliver.put(h.offset(), l.attempt());
+                failed(sub, pq, h.offset(), l.attempt(), l.failures() + 1, e.now(), "lease expired (the worker did not finish in time)", false);
                 expired++;
             } else {
                 skipped++;                                              // acked, extended or re-claimed since the leader looked
             }
         }
         return new SettleOutcome(expired, skipped);
+    }
+
+    /** One more failed delivery: wait for a retry, or become dead when the attempts are used up. */
+    private static void failed(Subscription sub, PartitionQueue pq, long offset, int attempt, int failures, long now, String reason, boolean backoff) {
+        if (failures >= sub.maxAttempts) {
+            pq.dead.put(offset, new Dead(attempt, failures, now, reason));
+        } else {
+            pq.redeliver.put(offset, new Waiting(attempt, failures, backoff ? now + backoffMs(sub, offset, failures) : 0));
+        }
+    }
+
+    /** base * 2^(failures-1), capped, plus up to 25% deterministic jitter (from the offset, so every replica agrees and retries spread out). */
+    static long backoffMs(Subscription sub, long offset, int failures) {
+        long delay = (long) sub.backoffBaseMs << Math.min(30, Math.max(0, failures - 1));
+        delay = Math.min(delay, sub.backoffMaxMs);
+        long jitter = (delay / 4) * (((offset * 2654435761L) ^ failures) & 0x7f) / 127;
+        return Math.min(delay + jitter, sub.backoffMaxMs + sub.backoffMaxMs / 4);
+    }
+
+    private Object nack(AckCommands.Nack n) {
+        Subscription sub = subscriptions.get(n.subscription());
+        if (sub == null) {
+            return Result.UNKNOWN_SUBSCRIPTION;
+        }
+        int settled = 0, rejected = 0;
+        for (QueueHandle h : n.handles()) {
+            PartitionQueue pq = h.partition() >= 0 && h.partition() < sub.partitions.length ? sub.partitions[h.partition()] : null;
+            if (pq == null || h.offset() < 0) {
+                rejected++;
+                continue;
+            }
+            Lease l = pq.leases.get(h.offset());
+            if (holds(l, n.worker(), h.attempt())) {
+                pq.leases.remove(h.offset());
+                failed(sub, pq, h.offset(), l.attempt(), l.failures() + 1, n.now(), n.reason().isEmpty() ? "failed" : n.reason(), true);
+                settled++;
+                continue;
+            }
+            Waiting w = pq.redeliver.get(h.offset());
+            Dead d = pq.dead.get(h.offset());
+            if ((w != null && w.attempt() == h.attempt()) || (d != null && d.attempt() == h.attempt())) {
+                settled++;                                              // already handled (expired, or nacked twice): idempotent
+            } else {
+                rejected++;                                             // fenced, or the message is finished
+            }
+        }
+        return new SettleOutcome(settled, rejected);
+    }
+
+    private Object deadAction(AckCommands.DeadAction a) {
+        Subscription sub = subscriptions.get(a.subscription());
+        if (sub == null) {
+            return Result.UNKNOWN_SUBSCRIPTION;
+        }
+        int settled = 0, rejected = 0;
+        for (QueueHandle h : a.handles()) {
+            PartitionQueue pq = h.partition() >= 0 && h.partition() < sub.partitions.length ? sub.partitions[h.partition()] : null;
+            Dead d = pq == null ? null : pq.dead.remove(h.offset());
+            if (d == null) {
+                rejected++;
+                continue;
+            }
+            if (a.type() == AckCommands.DEAD_RETRY) {
+                pq.redeliver.put(h.offset(), new Waiting(d.attempt(), 0, 0));          // a fresh start: failures reset, attempt numbers keep growing
+            } else {
+                pq.addDone(h.offset(), h.offset() + 1);
+            }
+            settled++;
+        }
+        return new SettleOutcome(settled, rejected);
     }
 
     // ------------------------------------------------------------------ readers
@@ -300,25 +397,56 @@ public final class AckStateMachine implements StateMachine {
         List<PartitionView> parts = new ArrayList<>(s.partitions.length);
         for (int i = 0; i < s.partitions.length; i++) {
             PartitionQueue pq = s.partitions[i];
-            parts.add(new PartitionView(i, pq.floor, pq.next, pq.leases.size(), pq.redeliver.size(), pq.doneAbove()));
+            parts.add(new PartitionView(i, pq.floor, pq.next, pq.leases.size(), pq.redeliver.size(), pq.doneAbove(), pq.dead.size()));
         }
-        return new SubscriptionView(name, s.topic, s.leaseMs, parts);
+        return new SubscriptionView(name, s.topic, s.leaseMs, s.maxAttempts, s.backoffBaseMs, s.backoffMaxMs, parts);
     }
 
-    /** Up to max messages waiting to be handed out again, lowest offset first. */
-    public synchronized List<Redelivery> redeliveries(String name, int partition, int max) {
+    /** Up to max messages that may be handed out again at time {@code now} (their backoff is over), lowest offset first. */
+    public synchronized List<Redelivery> redeliveries(String name, int partition, int max, long now) {
         Subscription s = subscriptions.get(name);
         List<Redelivery> out = new ArrayList<>();
         if (s == null || partition < 0 || partition >= s.partitions.length) {
             return out;
         }
-        for (Map.Entry<Long, Integer> e : s.partitions[partition].redeliver.entrySet()) {
+        for (Map.Entry<Long, Waiting> e : s.partitions[partition].redeliver.entrySet()) {
             if (out.size() >= max) {
                 break;
             }
-            out.add(new Redelivery(e.getKey(), e.getValue()));
+            if (e.getValue().notBefore() <= now) {
+                out.add(new Redelivery(e.getKey(), e.getValue().attempt(), e.getValue().failures()));
+            }
         }
         return out;
+    }
+
+    /** Dead-lettered messages, by partition then offset, at most max of them. */
+    public synchronized List<DeadView> deadLetters(String name, int max) {
+        Subscription s = subscriptions.get(name);
+        List<DeadView> out = new ArrayList<>();
+        if (s == null) {
+            return out;
+        }
+        for (int p = 0; p < s.partitions.length && out.size() < max; p++) {
+            for (Map.Entry<Long, Dead> e : s.partitions[p].dead.entrySet()) {
+                if (out.size() >= max) {
+                    break;
+                }
+                out.add(new DeadView(p, e.getKey(), e.getValue().attempt(), e.getValue().failures(), e.getValue().deadAt(), e.getValue().reason()));
+            }
+        }
+        return out;
+    }
+
+    public synchronized int deadCount(String name) {
+        Subscription s = subscriptions.get(name);
+        int n = 0;
+        if (s != null) {
+            for (PartitionQueue pq : s.partitions) {
+                n += pq.dead.size();
+            }
+        }
+        return n;
     }
 
     /** Every lease whose deadline is at or before now, grouped by subscription (what the leader proposes EXPIRE for). */
@@ -348,9 +476,9 @@ public final class AckStateMachine implements StateMachine {
     public synchronized String fingerprint() {
         StringBuilder b = new StringBuilder();
         new TreeMap<>(subscriptions).forEach((name, s) -> {
-            b.append(name).append('|').append(s.topic).append('|').append(s.leaseMs);
+            b.append(name).append('|').append(s.topic).append('|').append(s.leaseMs).append('|').append(s.maxAttempts).append('/').append(s.backoffBaseMs).append('/').append(s.backoffMaxMs);
             for (PartitionQueue pq : s.partitions) {
-                b.append("|f").append(pq.floor).append("n").append(pq.next).append("d").append(pq.done).append("l").append(pq.leases).append("r").append(pq.redeliver);
+                b.append("|f").append(pq.floor).append("n").append(pq.next).append("d").append(pq.done).append("l").append(pq.leases).append("r").append(pq.redeliver).append("x").append(pq.dead);
             }
             b.append('\n');
         });

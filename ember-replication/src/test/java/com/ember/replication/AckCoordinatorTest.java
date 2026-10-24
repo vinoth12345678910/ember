@@ -238,4 +238,71 @@ class AckCoordinatorTest {
         coordinator.expireLeases();
         assertEquals(before, log.proposals.size(), "a follower never proposes expiries");
     }
+
+    @Test
+    void aNackedMessageIsNotHandedOutAgainUntilItsBackoffIsOver() {
+        data.add(0, 2, "a");
+        data.partitionCount = 1;
+        coordinator.create("s", "t", true, 0, 3, 1000, 4000);
+        List<QueueMessage> got = coordinator.claim("s", "w1", 10, 0, 1 << 20).messages();
+        assertEquals(2, got.size());
+        assertEquals(1, coordinator.nack("s", "w1", "bank timeout", List.of(got.get(0).handle())).settled());
+        assertEquals(1, coordinator.settle(AckCommands.ACK, "s", "w1", 0, List.of(got.get(1).handle())).settled());
+
+        assertTrue(coordinator.claim("s", "w2", 10, 0, 1 << 20).messages().isEmpty(), "still backing off");
+        now += 1_300;                                                      // 1000 ms base + at most 25% jitter
+        List<QueueMessage> retry = coordinator.claim("s", "w2", 10, 0, 1 << 20).messages();
+        assertEquals(1, retry.size());
+        assertEquals(2, retry.get(0).attempt());
+        assertEquals(0, retry.get(0).offset());
+    }
+
+    @Test
+    void aMessageThatKeepsFailingEndsInTheDeadLetterListWithItsContentAndAdminsCanRetryOrDiscardIt() {
+        data.add(0, 3, "a");
+        data.partitionCount = 1;
+        coordinator.create("s", "t", true, 0, 2, 100, 100);
+        List<QueueMessage> got = coordinator.claim("s", "w", 10, 0, 1 << 20).messages();
+        coordinator.nack("s", "w", "poison", List.of(got.get(1).handle()));
+        coordinator.settle(AckCommands.ACK, "s", "w", 0, List.of(got.get(0).handle(), got.get(2).handle()));
+        now += 500;
+        List<QueueMessage> again = coordinator.claim("s", "w", 10, 0, 1 << 20).messages();
+        assertEquals(1, again.size());
+        coordinator.nack("s", "w", "still poison", List.of(again.get(0).handle()));
+
+        AckCoordinator.DeadListResult dead = coordinator.deadList("s", 10);
+        assertEquals(ErrorCode.NONE, dead.error());
+        assertEquals(1, dead.total());
+        assertEquals("still poison", dead.items().get(0).reason());
+        assertEquals(1, dead.items().get(0).offset());
+        assertEquals("a0:1", new String(dead.items().get(0).value()), "the content comes from the partition log");
+        var d = coordinator.describe("s").body();
+        assertEquals(1, d.partitions().get(0).dead());
+        assertEquals(2, d.maxAttempts());
+        assertEquals(100, d.backoffBaseMs());
+
+        assertEquals(1, coordinator.deadAction(AckCommands.DEAD_RETRY, "s", List.of(new QueueHandle(0, 1, 0))).settled());
+        assertEquals(0, coordinator.deadList("s", 10).total());
+        List<QueueMessage> retried = coordinator.claim("s", "w2", 10, 0, 1 << 20).messages();
+        assertEquals(1, retried.size());
+        assertEquals(3, retried.get(0).attempt(), "attempt numbers keep growing so old acks stay fenced");
+        coordinator.nack("s", "w2", "x", List.of(retried.get(0).handle()));
+        now += 500;
+        coordinator.claim("s", "w2", 10, 0, 1 << 20);
+        coordinator.nack("s", "w2", "x", List.of(new QueueHandle(0, 1, 4)));
+        assertEquals(1, coordinator.deadList("s", 10).total(), "it died again after a fresh budget of 2 failures");
+        assertEquals(1, coordinator.deadAction(AckCommands.DEAD_DISCARD, "s", List.of(new QueueHandle(0, 1, 0))).settled());
+        assertEquals(0, coordinator.deadList("s", 10).total());
+        assertEquals(3, coordinator.describe("s").body().partitions().get(0).floor(), "discarded = finished, the floor moves on");
+    }
+
+    @Test
+    void deadLetterCallsAnswerLikeTheOtherOperations() {
+        assertEquals(ErrorCode.UNKNOWN_SUBSCRIPTION, coordinator.deadList("nope", 5).error());
+        assertEquals(ErrorCode.UNKNOWN_SUBSCRIPTION, coordinator.nack("nope", "w", "r", List.of(new QueueHandle(0, 0, 1))).error());
+        assertEquals(ErrorCode.UNKNOWN_SUBSCRIPTION, coordinator.deadAction(AckCommands.DEAD_RETRY, "nope", List.of(new QueueHandle(0, 0, 0))).error());
+        log.leader = false;
+        assertEquals(ErrorCode.NOT_QUEUE_LEADER, coordinator.deadList("nope", 5).error());
+        assertEquals(ErrorCode.NOT_QUEUE_LEADER, coordinator.nack("nope", "w", "r", List.of()).error());
+    }
 }

@@ -21,7 +21,12 @@ public enum ApiKey {
     QUEUE_ACK(23),
     QUEUE_RELEASE(24),
     QUEUE_EXTEND(25),
-    QUEUE_DESCRIBE(26);
+    QUEUE_DESCRIBE(26),
+    /** The message failed: retry it later (with backoff) or dead-letter it once the attempts are used up. */
+    QUEUE_NACK(27),
+    QUEUE_DEAD_LIST(28),
+    QUEUE_DEAD_RETRY(29),
+    QUEUE_DEAD_DISCARD(30);
 
     private final short code;
 

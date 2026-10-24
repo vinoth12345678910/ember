@@ -1,5 +1,6 @@
 package com.ember.client;
 
+import com.ember.protocol.QueueDeadListResponse;
 import com.ember.protocol.QueueDescribeResponse;
 import com.ember.protocol.QueueMessage;
 
@@ -32,21 +33,51 @@ final class QueueCli {
                     throw new IllegalArgumentException("queue-create needs --topic=NAME");
                 }
                 int partitions = QueueConsumer.createSubscription(cfg, subscription, topic, Boolean.parseBoolean(flags.get("from-start", "true")),
-                        flags.getInt("lease-ms", 0));
+                        flags.getInt("lease-ms", 0), flags.getInt("max-attempts", 0), flags.getInt("backoff-ms", 0), flags.getInt("backoff-max-ms", 0));
                 out.println("subscription " + subscription + " created on " + topic + " (" + partitions + " partitions)");
             }
             case "queue-describe" -> {
                 try (QueueConsumer q = new QueueConsumer(cfg, subscription, "cli")) {
                     QueueDescribeResponse d = q.describe();
-                    out.println("subscription " + subscription + " on " + d.topic() + ", lease " + d.leaseMs() + " ms");
-                    out.println("partition  floor  next  logEnd  inFlight  redeliver  doneAbove");
+                    out.println("subscription " + subscription + " on " + d.topic() + ", lease " + d.leaseMs() + " ms, dead after " + d.maxAttempts()
+                            + " failed attempts, retry backoff " + d.backoffBaseMs() + ".." + d.backoffMaxMs() + " ms");
+                    out.println("partition  floor  next  logEnd  inFlight  redeliver  doneAbove  dead");
                     for (QueueDescribeResponse.PartitionState p : d.partitions()) {
-                        out.printf(Locale.ROOT, "%9d  %5d  %4d  %6d  %8d  %9d  %9d%n", p.partition(), p.floor(), p.next(), p.logEnd(), p.inFlight(), p.redeliver(), p.doneAbove());
+                        out.printf(Locale.ROOT, "%9d  %5d  %4d  %6d  %8d  %9d  %9d  %4d%n", p.partition(), p.floor(), p.next(), p.logEnd(), p.inFlight(), p.redeliver(), p.doneAbove(), p.dead());
                     }
                 }
             }
             case "queue-bench" -> bench(cfg, flags, subscription, out);
+            case "queue-dead", "queue-dead-retry", "queue-dead-discard" -> dead(command, cfg, flags, subscription, out);
             default -> throw new IllegalArgumentException("unknown command " + command);
+        }
+    }
+
+    /** queue-dead lists; queue-dead-retry / queue-dead-discard act on --partition=P --offset=N, or on every dead message with --all. */
+    private static void dead(String command, ClientConfig cfg, Flags flags, String subscription, PrintStream out) throws IOException {
+        try (QueueConsumer q = new QueueConsumer(cfg, subscription, "cli")) {
+            QueueDeadListResponse dead = q.deadLetters(flags.getInt("max", 100));
+            if (command.equals("queue-dead")) {
+                out.println(dead.total() + " dead-lettered message(s)" + (dead.total() > dead.items().size() ? ", showing " + dead.items().size() : ""));
+                for (QueueDeadListResponse.DeadMessage m : dead.items()) {
+                    out.printf(Locale.ROOT, "partition %d offset %d: %d failed attempts, reason: %s%n    key=%s value=%s%n", m.partition(), m.offset(), m.failures(),
+                            m.reason(), m.key() == null ? "null" : new String(m.key(), java.nio.charset.StandardCharsets.UTF_8),
+                            new String(m.value(), java.nio.charset.StandardCharsets.UTF_8));
+                }
+                return;
+            }
+            List<QueueDeadListResponse.DeadMessage> chosen = new ArrayList<>();
+            for (QueueDeadListResponse.DeadMessage m : dead.items()) {
+                if (flags.has("all") || (flags.has("partition") && flags.has("offset")
+                        && m.partition() == flags.getInt("partition", -1) && m.offset() == Long.parseLong(flags.get("offset", "-1")))) {
+                    chosen.add(m);
+                }
+            }
+            if (!flags.has("all") && !(flags.has("partition") && flags.has("offset"))) {
+                throw new IllegalArgumentException(command + " needs --all or --partition=P --offset=N");
+            }
+            var r = command.equals("queue-dead-retry") ? q.retryDead(chosen) : q.discardDead(chosen);
+            out.println((command.equals("queue-dead-retry") ? "retried " : "discarded ") + r.settled() + " message(s), " + r.rejected() + " not found");
         }
     }
 
@@ -60,10 +91,12 @@ final class QueueCli {
         int claim = flags.getInt("claim", 100);
         int records = flags.getInt("records", Integer.MAX_VALUE);
         int holdMs = flags.getInt("hold-ms", 0);
+        int poisonEvery = flags.getInt("poison-every", 0);                  // every Nth message (by offset) always fails, to show it does not block the rest
         AtomicLong acked = new AtomicLong();
         AtomicLong claimed = new AtomicLong();
         AtomicLong redelivered = new AtomicLong();
         AtomicLong rejected = new AtomicLong();
+        AtomicLong nacked = new AtomicLong();
         LatencyHistogram claimLatency = new LatencyHistogram();
         LatencyHistogram ackLatency = new LatencyHistogram();
         long startNanos = System.nanoTime();
@@ -91,8 +124,19 @@ final class QueueCli {
                         if (holdMs > 0) {
                             Thread.sleep(holdMs);
                         }
+                        List<QueueMessage> good = got;
+                        if (poisonEvery > 0) {
+                            List<QueueMessage> bad = new ArrayList<>();
+                            good = new ArrayList<>();
+                            for (QueueMessage m : got) {
+                                (m.offset() % poisonEvery == 0 ? bad : good).add(m);
+                            }
+                            if (!bad.isEmpty()) {
+                                nacked.addAndGet(q.nack(bad, "simulated poison message").settled());
+                            }
+                        }
                         long t1 = System.nanoTime();
-                        var r = q.ack(got);
+                        var r = q.ack(good);
                         synchronized (ackLatency) {
                             ackLatency.record((System.nanoTime() - t1) / 1_000);
                         }
@@ -118,8 +162,8 @@ final class QueueCli {
         }
         double seconds = (System.nanoTime() - startNanos) / 1e9;
         out.printf(Locale.ROOT, "queue-bench: %d workers, claim up to %d, hold %d ms%n", workers, claim, holdMs);
-        out.printf(Locale.ROOT, "acked %,d messages in %.2f s = %,.0f messages/s (claimed %,d, redelivered %,d, ack rejected %,d)%n",
-                acked.get(), seconds, acked.get() / seconds, claimed.get(), redelivered.get(), rejected.get());
+        out.printf(Locale.ROOT, "acked %,d messages in %.2f s = %,.0f messages/s (claimed %,d, redelivered %,d, nacked %,d, ack rejected %,d)%n",
+                acked.get(), seconds, acked.get() / seconds, claimed.get(), redelivered.get(), nacked.get(), rejected.get());
         out.println("claim latency: " + summary(claimLatency));
         out.println("ack latency:   " + summary(ackLatency));
     }

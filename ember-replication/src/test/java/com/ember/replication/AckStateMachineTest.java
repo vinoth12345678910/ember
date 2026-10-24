@@ -101,7 +101,7 @@ class AckStateMachineTest {
         claim("s", fresh(0, "w1", 1000, 0, 1));
         assertEquals(new AckStateMachine.SettleOutcome(0, 1), expire("s", 999, h(0, 0, 1)), "not due yet");
         assertEquals(new AckStateMachine.SettleOutcome(1, 0), expire("s", 1000, h(0, 0, 1)));
-        assertEquals(List.of(new AckStateMachine.Redelivery(0, 1)), sm.redeliveries("s", 0, 10));
+        assertEquals(List.of(new AckStateMachine.Redelivery(0, 1, 1)), sm.redeliveries("s", 0, 10, Long.MAX_VALUE), "an expired lease is one failed delivery");
         assertEquals(1, p("s", 0).redeliver());
         assertEquals(0, p("s", 0).inFlight());
 
@@ -121,7 +121,7 @@ class AckStateMachineTest {
         claim("s", fresh(0, "w1", 1000, 0, 1));
         expire("s", 2000, h(0, 0, 1));                                   // expired, waiting in the redeliver set
         assertEquals(new AckStateMachine.SettleOutcome(1, 0), ack("s", "w1", h(0, 0, 1)), "the work was done: no needless duplicate");
-        assertEquals(0, sm.redeliveries("s", 0, 10).size());
+        assertEquals(0, sm.redeliveries("s", 0, 10, Long.MAX_VALUE).size());
         assertEquals(1, p("s", 0).floor());
     }
 
@@ -143,7 +143,7 @@ class AckStateMachineTest {
         assertEquals(new AckStateMachine.SettleOutcome(1, 0), settle(AckCommands.RELEASE, "s", "w1", 0, h(0, 0, 1)));
         assertEquals(new AckStateMachine.SettleOutcome(1, 0), settle(AckCommands.RELEASE, "s", "w1", 0, h(0, 0, 1)), "idempotent");
         assertEquals(new AckStateMachine.SettleOutcome(0, 1), settle(AckCommands.RELEASE, "s", "w2", 0, h(0, 1, 1)), "not the holder");
-        assertEquals(List.of(new AckStateMachine.Redelivery(0, 1)), sm.redeliveries("s", 0, 10));
+        assertEquals(List.of(new AckStateMachine.Redelivery(0, 1, 0)), sm.redeliveries("s", 0, 10, Long.MAX_VALUE));
 
         assertEquals(new AckStateMachine.SettleOutcome(1, 0), settle(AckCommands.EXTEND, "s", "w1", 9000, h(0, 1, 1)));
         assertEquals(new AckStateMachine.SettleOutcome(1, 0), settle(AckCommands.EXTEND, "s", "w1", 10, h(0, 1, 1)), "a shorter deadline is ignored, still accepted");
@@ -243,5 +243,175 @@ class AckStateMachineTest {
         assertThrows(IllegalArgumentException.class, () -> AckCommands.decodeClaim(new byte[]{AckCommands.CLAIM, 0, 1, 's', 0x7f, 0, 0, 0}));
         byte[] trailing = Arrays.copyOf(AckCommands.encode(new AckCommands.Delete("s")), 10);
         assertThrows(IllegalArgumentException.class, () -> AckCommands.decodeDelete(trailing));
+    }
+
+    // ------------------------------------------------------------------ retry policy and the dead-letter set
+
+    private Object createWithPolicy(String sub, int maxAttempts, int base, int max, long... starts) {
+        List<Long> s = new ArrayList<>();
+        for (long x : starts) s.add(x);
+        return apply(AckCommands.encode(new AckCommands.Create(sub, "t", 30_000, s, maxAttempts, base, max)));
+    }
+
+    private AckStateMachine.SettleOutcome nack(String sub, String worker, long now, String reason, QueueHandle... h) {
+        return (AckStateMachine.SettleOutcome) apply(AckCommands.encode(new AckCommands.Nack(sub, worker, now, reason, List.of(h))));
+    }
+
+    private AckStateMachine.SettleOutcome deadAction(byte type, String sub, QueueHandle... h) {
+        return (AckStateMachine.SettleOutcome) apply(AckCommands.encode(new AckCommands.DeadAction(type, sub, List.of(h))));
+    }
+
+    @Test
+    void aNackedMessageWaitsOutAnExponentialBackoffAndIsDeadLetteredAfterMaxAttempts() {
+        createWithPolicy("s", 3, 1000, 8000, 0);
+        claim("s", fresh(0, "w1", 1_000_000, 0, 1));
+        assertEquals(new AckStateMachine.SettleOutcome(1, 0), nack("s", "w1", 10_000, "boom", h(0, 0, 1)));
+        assertTrue(sm.redeliveries("s", 0, 10, 10_999).isEmpty(), "still backing off (at least 1000 ms)");
+        assertEquals(1, p("s", 0).redeliver(), "it still counts as waiting");
+        assertEquals(1, sm.redeliveries("s", 0, 10, 11_250).size(), "due after at most 1250 ms (25% jitter)");
+
+        assertEquals(List.of(OK), claim("s", new AckCommands.Allotment(0, "w2", 2_000_000, 0, 0, List.of(0L))));
+        assertEquals(new AckStateMachine.SettleOutcome(1, 0), nack("s", "w2", 20_000, "boom again", h(0, 0, 2)));
+        assertTrue(sm.redeliveries("s", 0, 10, 21_999).isEmpty(), "the second wait is at least 2000 ms");
+        assertEquals(1, sm.redeliveries("s", 0, 10, 22_500).size());
+
+        claim("s", new AckCommands.Allotment(0, "w3", 3_000_000, 0, 0, List.of(0L)));
+        assertEquals(new AckStateMachine.SettleOutcome(1, 0), nack("s", "w3", 30_000, "third failure", h(0, 0, 3)));
+        assertEquals(1, p("s", 0).dead(), "the third failure used up the attempts");
+        assertEquals(0, p("s", 0).redeliver());
+        assertEquals(0, p("s", 0).inFlight());
+        assertEquals(0, p("s", 0).floor(), "a dead message holds the floor");
+        List<AckStateMachine.DeadView> dead = sm.deadLetters("s", 10);
+        assertEquals(1, dead.size());
+        assertEquals("third failure", dead.get(0).reason());
+        assertEquals(3, dead.get(0).failures());
+        assertEquals(30_000, dead.get(0).deadAt());
+        assertEquals(new AckStateMachine.SettleOutcome(0, 1), ack("s", "w3", h(0, 0, 3)), "a dead message cannot be acked");
+        assertEquals(new AckStateMachine.SettleOutcome(1, 0), nack("s", "w3", 31_000, "again", h(0, 0, 3)), "a repeated nack of the dead attempt is a no-op");
+        assertEquals(1, sm.deadCount("s"));
+    }
+
+    @Test
+    void aPoisonMessageNeverBlocksTheOnesAfterIt() {
+        createWithPolicy("s", 2, 100, 100, 0);
+        claim("s", fresh(0, "w", 1_000_000, 0, 5));
+        nack("s", "w", 1000, "poison", h(0, 2, 1));
+        ack("s", "w", h(0, 0, 1), h(0, 1, 1), h(0, 3, 1), h(0, 4, 1));
+        assertEquals(2, p("s", 0).floor(), "0 and 1 are finished, 2 is the poison one");
+        assertEquals(2, p("s", 0).doneAbove(), "3 and 4 finished above it");
+        assertEquals(List.of(OK), claim("s", new AckCommands.Allotment(0, "w", 2_000_000, 0, 0, List.of(2L))));
+        nack("s", "w", 2000, "poison", h(0, 2, 2));
+        assertEquals(1, p("s", 0).dead());
+        assertEquals(2, p("s", 0).floor());
+        assertEquals(List.of(OK), claim("s", fresh(0, "w", 3_000_000, 5, 3)), "everything after it keeps flowing");
+    }
+
+    @Test
+    void aLeaseThatRunsOutCountsAsAFailureButAReleaseDoesNot() {
+        createWithPolicy("s", 2, 1000, 1000, 0);
+        claim("s", fresh(0, "w1", 1000, 0, 2));
+        for (int i = 1; i <= 5; i++) {                                                         // release over and over: never dead
+            assertEquals(new AckStateMachine.SettleOutcome(1, 0), settle(AckCommands.RELEASE, "s", "w1", 0, h(0, 1, i)));
+            assertEquals(List.of(OK), claim("s", new AckCommands.Allotment(0, "w1", 1_000_000, 0, 0, List.of(1L))));
+        }
+        assertEquals(0, p("s", 0).dead());
+
+        expire("s", 1000, h(0, 0, 1));                                                          // first expiry of offset 0: failure 1, waiting at once
+        assertEquals(1, sm.redeliveries("s", 0, 10, 0).size(), "due immediately: a timed-out lease has no extra backoff");
+        claim("s", new AckCommands.Allotment(0, "w2", 5000, 0, 0, List.of(0L)));
+        expire("s", 5000, h(0, 0, 2));                                                          // second expiry: failure 2 = max
+        assertEquals(1, p("s", 0).dead());
+        assertEquals("lease expired (the worker did not finish in time)", sm.deadLetters("s", 5).get(0).reason());
+    }
+
+    @Test
+    void retryingADeadMessageGivesItAFreshFailureBudgetAndKeepsAttemptNumbersGrowing() {
+        createWithPolicy("s", 2, 100, 100, 0);
+        claim("s", fresh(0, "w", 1_000_000, 0, 1));
+        nack("s", "w", 1000, "x", h(0, 0, 1));
+        claim("s", new AckCommands.Allotment(0, "w", 1_000_000, 0, 0, List.of(0L)));
+        nack("s", "w", 2000, "x", h(0, 0, 2));
+        assertEquals(1, p("s", 0).dead());
+
+        assertEquals(new AckStateMachine.SettleOutcome(1, 0), deadAction(AckCommands.DEAD_RETRY, "s", h(0, 0, 0)));
+        assertEquals(new AckStateMachine.SettleOutcome(0, 1), deadAction(AckCommands.DEAD_RETRY, "s", h(0, 0, 0)), "nothing left to retry");
+        assertEquals(0, p("s", 0).dead());
+        List<AckStateMachine.Redelivery> due = sm.redeliveries("s", 0, 10, 0);
+        assertEquals(List.of(new AckStateMachine.Redelivery(0, 2, 0)), due, "due at once, failures reset, last attempt was 2");
+        claim("s", new AckCommands.Allotment(0, "w2", 1_000_000, 0, 0, List.of(0L)));
+        assertEquals(new AckStateMachine.SettleOutcome(0, 1), ack("s", "w", h(0, 0, 2)), "the old attempt 2 is fenced: the new delivery is attempt 3");
+        assertEquals(new AckStateMachine.SettleOutcome(1, 0), ack("s", "w2", h(0, 0, 3)));
+        assertEquals(1, p("s", 0).floor());
+    }
+
+    @Test
+    void discardingADeadMessageFinishesItAndLetsTheFloorMove() {
+        createWithPolicy("s", 1, 100, 100, 0);
+        claim("s", fresh(0, "w", 1_000_000, 0, 3));
+        nack("s", "w", 1000, "bad", h(0, 0, 1));
+        ack("s", "w", h(0, 1, 1), h(0, 2, 1));
+        assertEquals(0, p("s", 0).floor());
+        assertEquals(new AckStateMachine.SettleOutcome(1, 0), deadAction(AckCommands.DEAD_DISCARD, "s", h(0, 0, 0)));
+        assertEquals(3, p("s", 0).floor());
+        assertEquals(0, p("s", 0).dead());
+        assertEquals(0, p("s", 0).doneAbove());
+    }
+
+    @Test
+    void aNackFromTheWrongWorkerOrAttemptIsRejectedAndABackoffIsCappedAtTheMaximum() {
+        createWithPolicy("s", 100, 1000, 4000, 0);
+        claim("s", fresh(0, "w1", 1_000_000, 0, 1));
+        assertEquals(new AckStateMachine.SettleOutcome(0, 1), nack("s", "w2", 5, "x", h(0, 0, 1)), "not the holder");
+        assertEquals(new AckStateMachine.SettleOutcome(0, 1), nack("s", "w1", 5, "x", h(0, 0, 9)), "wrong attempt");
+        assertEquals(0, p("s", 0).redeliver());
+        for (int attempt = 1; attempt <= 12; attempt++) {                                      // fail many times: the wait must stay <= 4000 + 25%
+            nack("s", "w1", 1_000_000, "x", h(0, 0, attempt));
+            assertEquals(1, sm.redeliveries("s", 0, 10, 1_005_000).size(), "never waits longer than max + 25% (attempt " + attempt + ")");
+            claim("s", new AckCommands.Allotment(0, "w1", 9_000_000, 0, 0, List.of(0L)));
+        }
+    }
+
+    @Test
+    void logsWrittenBeforeTheRetryPolicyExistedStillCreateSubscriptionsWithDefaults() {
+        byte[] full = AckCommands.encode(new AckCommands.Create("old", "t", 30_000, List.of(0L, 0L)));
+        byte[] legacy = Arrays.copyOf(full, full.length - 12);                                   // what an older broker wrote
+        assertEquals(OK, apply(legacy));
+        assertEquals(AckCommands.DEFAULT_MAX_ATTEMPTS, sm.view("old").maxAttempts());
+        assertEquals(AckCommands.DEFAULT_BACKOFF_BASE_MS, sm.view("old").backoffBaseMs());
+        assertEquals(INVALID, createWithPolicy("bad1", 0, 1000, 2000, 0), "maxAttempts must be >= 1");
+        assertEquals(INVALID, createWithPolicy("bad2", 3, 5000, 1000, 0), "max backoff below the base");
+    }
+
+    @Test
+    void failuresAndDeadLettersReplayIdenticallyOnAnotherReplica() {
+        List<byte[]> log = new ArrayList<>();
+        log.add(AckCommands.encode(new AckCommands.Create("s", "t", 30_000, List.of(0L, 0L), 3, 100, 800)));
+        Random random = new Random(7);
+        long[] next = {0, 0};
+        long now = 1000;
+        for (int i = 0; i < 400; i++) {
+            now += 50;
+            int part = random.nextInt(2);
+            int n = 1 + random.nextInt(3);
+            log.add(AckCommands.encode(new AckCommands.Claim("s", List.of(fresh(part, "w" + random.nextInt(3), now + 500, next[part], n)))));
+            next[part] += n;
+            for (int k = 0; k < 4; k++) {
+                QueueHandle handle = h(part, random.nextInt((int) next[part]), 1 + random.nextInt(3));
+                switch (random.nextInt(6)) {
+                    case 0 -> log.add(AckCommands.encode(new AckCommands.Settle(AckCommands.ACK, "s", "w" + random.nextInt(3), 0, List.of(handle))));
+                    case 1, 2 -> log.add(AckCommands.encode(new AckCommands.Nack("s", "w" + random.nextInt(3), now, "r" + k, List.of(handle))));
+                    case 3 -> log.add(AckCommands.encode(new AckCommands.Expire("s", now, List.of(handle))));
+                    case 4 -> log.add(AckCommands.encode(new AckCommands.DeadAction(random.nextBoolean() ? AckCommands.DEAD_RETRY : AckCommands.DEAD_DISCARD, "s", List.of(handle))));
+                    default -> log.add(AckCommands.encode(new AckCommands.Claim("s", List.of(new AckCommands.Allotment(part, "w9", now + 500, 0, 0, List.of((long) handle.offset()))))));
+                }
+            }
+        }
+        AckStateMachine a = new AckStateMachine(), b = new AckStateMachine();
+        long i = 0;
+        for (byte[] c : log) {
+            assertEquals(String.valueOf(a.apply(++i, LogEntry.command(1, c))), String.valueOf(b.apply(i, LogEntry.command(1, c))));
+        }
+        assertEquals(a.fingerprint(), b.fingerprint());
+        assertTrue(a.deadCount("s") > 0, "the random run should have dead-lettered something");
     }
 }

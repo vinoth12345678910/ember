@@ -175,11 +175,12 @@ final class AdminServer implements AutoCloseable {
         for (String name : replicas.ackState().names()) {
             com.ember.replication.AckStateMachine.SubscriptionView v = replicas.ackState().view(name);
             if (v == null) continue;
-            w.beginObject().name("subscription").value(name).name("topic").value(v.topic()).name("leaseMs").value(v.leaseMs()).name("partitions").beginArray();
+            w.beginObject().name("subscription").value(name).name("topic").value(v.topic()).name("leaseMs").value(v.leaseMs()).name("maxAttempts").value(v.maxAttempts())
+                    .name("backoffBaseMs").value(v.backoffBaseMs()).name("backoffMaxMs").value(v.backoffMaxMs()).name("partitions").beginArray();
             for (com.ember.replication.AckStateMachine.PartitionView p : v.partitions()) {
                 long logEnd = replicas.topic(v.topic()) == null ? 0 : replicas.topic(v.topic()).replicas().get(p.partition()).dataLog().nextOffset();
                 w.beginObject().name("partition").value(p.partition()).name("floor").value(p.floor()).name("next").value(p.next()).name("logEnd").value(logEnd)
-                        .name("inFlight").value(p.inFlight()).name("redeliver").value(p.redeliver()).name("doneAbove").value(p.doneAbove()).endObject();
+                        .name("inFlight").value(p.inFlight()).name("redeliver").value(p.redeliver()).name("doneAbove").value(p.doneAbove()).name("dead").value(p.dead()).endObject();
             }
             w.endArray().endObject();
         }

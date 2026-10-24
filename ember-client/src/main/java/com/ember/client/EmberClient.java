@@ -124,8 +124,18 @@ public class EmberClient implements AutoCloseable {
         return (FindCoordinatorResponse) call(new QueueFindRequest(), (short) 0);
     }
 
-    public synchronized int queueCreate(String subscription, String topic, boolean fromStart, int leaseMs) throws IOException {
-        return ((QueueCreateResponse) call(new QueueCreateRequest(subscription, topic, fromStart, leaseMs), (short) 0)).partitionCount();
+    public synchronized int queueCreate(String subscription, String topic, boolean fromStart, int leaseMs, int maxAttempts, int backoffBaseMs,
+                                        int backoffMaxMs) throws IOException {
+        return ((QueueCreateResponse) call(new QueueCreateRequest(subscription, topic, fromStart, leaseMs, maxAttempts, backoffBaseMs, backoffMaxMs),
+                (short) 0)).partitionCount();
+    }
+
+    public synchronized QueueSettleResponse queueNack(String subscription, String worker, List<QueueHandle> handles, String reason) throws IOException {
+        return (QueueSettleResponse) call(new QueueNackRequest(subscription, worker, handles, reason), (short) 0);
+    }
+
+    public synchronized QueueDeadListResponse queueDeadList(String subscription, int maxItems) throws IOException {
+        return (QueueDeadListResponse) call(new QueueDeadListRequest(subscription, maxItems), (short) 0);
     }
 
     public synchronized List<QueueMessage> queueClaim(String subscription, String worker, int maxMessages, int leaseMs, int maxBytes) throws IOException {

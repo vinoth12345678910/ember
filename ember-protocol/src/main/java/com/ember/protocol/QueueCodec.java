@@ -19,11 +19,11 @@ final class QueueCodec {
 
     static boolean handles(Request r) {
         return r instanceof QueueFindRequest || r instanceof QueueCreateRequest || r instanceof QueueClaimRequest
-                || r instanceof QueueSettleRequest || r instanceof QueueDescribeRequest;
+                || r instanceof QueueSettleRequest || r instanceof QueueDescribeRequest || r instanceof QueueNackRequest || r instanceof QueueDeadListRequest;
     }
 
     static boolean handles(Response r) {
-        return r instanceof QueueCreateResponse || r instanceof QueueClaimResponse || r instanceof QueueSettleResponse || r instanceof QueueDescribeResponse;
+        return r instanceof QueueCreateResponse || r instanceof QueueClaimResponse || r instanceof QueueSettleResponse || r instanceof QueueDescribeResponse || r instanceof QueueDeadListResponse;
     }
 
     private static String name(ByteBuffer buf, String what) {
@@ -41,15 +41,26 @@ final class QueueCodec {
         return s;
     }
 
+    static final int MAX_REASON_BYTES = 512;
+
+    private static String checkReason(String s) {
+        if (s.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_REASON_BYTES) {
+            throw new ProtocolException("reason must be at most " + MAX_REASON_BYTES + " UTF-8 bytes");
+        }
+        return s;
+    }
+
     // ------------------------------------------------------------------ requests
 
     static int requestSize(Request r) {
         return switch (r) {
             case QueueFindRequest x -> 0;
-            case QueueCreateRequest x -> stringSize(x.subscription()) + stringSize(x.topic()) + 1 + 4;
+            case QueueCreateRequest x -> stringSize(x.subscription()) + stringSize(x.topic()) + 1 + 4 + 12;
             case QueueClaimRequest x -> stringSize(x.subscription()) + stringSize(x.worker()) + 4 + 4 + 4;
             case QueueSettleRequest x -> stringSize(x.subscription()) + stringSize(x.worker()) + 4 + 4 + x.handles().size() * HANDLE_BYTES;
             case QueueDescribeRequest x -> stringSize(x.subscription());
+            case QueueNackRequest x -> stringSize(x.subscription()) + stringSize(x.worker()) + stringSize(x.reason()) + 4 + x.handles().size() * HANDLE_BYTES;
+            case QueueDeadListRequest x -> stringSize(x.subscription()) + 4;
             default -> throw new IllegalArgumentException("not a queue request: " + r);
         };
     }
@@ -63,7 +74,7 @@ final class QueueCodec {
                 putString(buf, checkName(x.subscription(), "subscription"));
                 putString(buf, x.topic());
                 buf.put((byte) (x.fromStart() ? 1 : 0));
-                buf.putInt(x.leaseMs());
+                buf.putInt(x.leaseMs()).putInt(x.maxAttempts()).putInt(x.backoffBaseMs()).putInt(x.backoffMaxMs());
             }
             case QueueClaimRequest x -> {
                 putString(buf, checkName(x.subscription(), "subscription"));
@@ -83,6 +94,22 @@ final class QueueCodec {
                 }
             }
             case QueueDescribeRequest x -> putString(buf, checkName(x.subscription(), "subscription"));
+            case QueueNackRequest x -> {
+                if (x.handles().size() > MAX_HANDLES) {
+                    throw new ProtocolException("handle count " + x.handles().size() + " is above the limit of " + MAX_HANDLES);
+                }
+                putString(buf, checkName(x.subscription(), "subscription"));
+                putString(buf, checkName(x.worker(), "worker"));
+                putString(buf, checkReason(x.reason()));
+                buf.putInt(x.handles().size());
+                for (QueueHandle h : x.handles()) {
+                    buf.putInt(h.partition()).putLong(h.offset()).putInt(h.attempt());
+                }
+            }
+            case QueueDeadListRequest x -> {
+                putString(buf, checkName(x.subscription(), "subscription"));
+                buf.putInt(x.maxItems());
+            }
             default -> throw new IllegalArgumentException("not a queue request: " + r);
         }
     }
@@ -95,7 +122,14 @@ final class QueueCodec {
                 String topic = getString(buf, "topic");
                 requireValidTopic(topic);
                 boolean fromStart = getBoolean(buf, "fromStart");
-                yield new QueueCreateRequest(sub, topic, fromStart, getInt(buf, "leaseMs"));
+                int lease = getInt(buf, "leaseMs");
+                int maxAttempts = getInt(buf, "maxAttempts");
+                int base = getInt(buf, "backoffBaseMs");
+                int max = getInt(buf, "backoffMaxMs");
+                if (lease < 0 || maxAttempts < 0 || base < 0 || max < 0) {
+                    throw new ProtocolException("negative retry policy value");
+                }
+                yield new QueueCreateRequest(sub, topic, fromStart, lease, maxAttempts, base, max);
             }
             case QUEUE_CLAIM -> {
                 String sub = name(buf, "subscription");
@@ -108,7 +142,7 @@ final class QueueCodec {
                 }
                 yield new QueueClaimRequest(sub, worker, max, lease, bytes);
             }
-            case QUEUE_ACK, QUEUE_RELEASE, QUEUE_EXTEND -> {
+            case QUEUE_ACK, QUEUE_RELEASE, QUEUE_EXTEND, QUEUE_DEAD_RETRY, QUEUE_DEAD_DISCARD -> {
                 String sub = name(buf, "subscription");
                 String worker = name(buf, "worker");
                 int lease = getInt(buf, "leaseMs");
@@ -123,6 +157,29 @@ final class QueueCodec {
                 yield new QueueSettleRequest(key, sub, worker, handles, lease);
             }
             case QUEUE_DESCRIBE -> new QueueDescribeRequest(name(buf, "subscription"));
+            case QUEUE_NACK -> {
+                String sub = name(buf, "subscription");
+                String worker = name(buf, "worker");
+                String reason = getString(buf, "reason");
+                checkReason(reason);
+                int count = getCount(buf, HANDLE_BYTES, "handle");
+                if (count > MAX_HANDLES) {
+                    throw new ProtocolException("handle count " + count + " is above the limit of " + MAX_HANDLES);
+                }
+                List<QueueHandle> handles = new ArrayList<>(count);
+                for (int i = 0; i < count; i++) {
+                    handles.add(new QueueHandle(getInt(buf, "partition"), getLong(buf, "offset"), getInt(buf, "attempt")));
+                }
+                yield new QueueNackRequest(sub, worker, handles, reason);
+            }
+            case QUEUE_DEAD_LIST -> {
+                String sub = name(buf, "subscription");
+                int max = getInt(buf, "maxItems");
+                if (max < 1 || max > 1000) {
+                    throw new ProtocolException("maxItems must be 1..1000");
+                }
+                yield new QueueDeadListRequest(sub, max);
+            }
             default -> throw new IllegalArgumentException("not a queue api: " + key);
         };
     }
@@ -140,7 +197,14 @@ final class QueueCodec {
                 yield n;
             }
             case QueueSettleResponse x -> 8;
-            case QueueDescribeResponse x -> stringSize(x.topic()) + 4 + 4 + x.partitions().size() * (4 + 8 + 8 + 8 + 4 + 4 + 8);
+            case QueueDescribeResponse x -> stringSize(x.topic()) + 4 * 4 + 4 + x.partitions().size() * (4 + 8 + 8 + 8 + 4 + 4 + 8 + 4);
+            case QueueDeadListResponse x -> {
+                int n = 4 + 4;
+                for (QueueDeadListResponse.DeadMessage m : x.items()) {
+                    n += 4 + 8 + 4 + 4 + 8 + stringSize(m.reason()) + 4 + (m.key() == null ? 0 : m.key().length) + 4 + m.value().length;
+                }
+                yield n;
+            }
             default -> throw new IllegalArgumentException("not a queue response: " + r);
         };
     }
@@ -161,11 +225,22 @@ final class QueueCodec {
             case QueueSettleResponse x -> buf.putInt(x.settled()).putInt(x.rejected());
             case QueueDescribeResponse x -> {
                 putString(buf, x.topic());
-                buf.putInt(x.leaseMs());
+                buf.putInt(x.leaseMs()).putInt(x.maxAttempts()).putInt(x.backoffBaseMs()).putInt(x.backoffMaxMs());
                 buf.putInt(x.partitions().size());
                 for (QueueDescribeResponse.PartitionState p : x.partitions()) {
                     buf.putInt(p.partition()).putLong(p.floor()).putLong(p.next()).putLong(p.logEnd())
-                            .putInt(p.inFlight()).putInt(p.redeliver()).putLong(p.doneAbove());
+                            .putInt(p.inFlight()).putInt(p.redeliver()).putLong(p.doneAbove()).putInt(p.dead());
+                }
+            }
+            case QueueDeadListResponse x -> {
+                buf.putInt(x.total()).putInt(x.items().size());
+                for (QueueDeadListResponse.DeadMessage m : x.items()) {
+                    buf.putInt(m.partition()).putLong(m.offset()).putInt(m.attempts()).putInt(m.failures()).putLong(m.deadAt());
+                    putString(buf, m.reason());
+                    buf.putInt(m.key() == null ? -1 : m.key().length);
+                    if (m.key() != null) buf.put(m.key());
+                    buf.putInt(m.value().length);
+                    buf.put(m.value());
                 }
             }
             default -> throw new IllegalArgumentException("not a queue response: " + r);
@@ -197,17 +272,45 @@ final class QueueCodec {
                 }
                 yield new QueueClaimResponse(messages);
             }
-            case QUEUE_ACK, QUEUE_RELEASE, QUEUE_EXTEND -> new QueueSettleResponse(getInt(buf, "settled"), getInt(buf, "rejected"));
+            case QUEUE_ACK, QUEUE_RELEASE, QUEUE_EXTEND, QUEUE_NACK, QUEUE_DEAD_RETRY, QUEUE_DEAD_DISCARD ->
+                    new QueueSettleResponse(getInt(buf, "settled"), getInt(buf, "rejected"));
             case QUEUE_DESCRIBE -> {
                 String topic = getString(buf, "topic");
                 int lease = getInt(buf, "leaseMs");
-                int count = getCount(buf, 4 + 8 + 8 + 8 + 4 + 4 + 8, "partition");
+                int maxAttempts = getInt(buf, "maxAttempts");
+                int base = getInt(buf, "backoffBaseMs");
+                int max = getInt(buf, "backoffMaxMs");
+                int count = getCount(buf, 4 + 8 + 8 + 8 + 4 + 4 + 8 + 4, "partition");
                 List<QueueDescribeResponse.PartitionState> parts = new ArrayList<>(count);
                 for (int i = 0; i < count; i++) {
                     parts.add(new QueueDescribeResponse.PartitionState(getInt(buf, "partition"), getLong(buf, "floor"), getLong(buf, "next"),
-                            getLong(buf, "logEnd"), getInt(buf, "inFlight"), getInt(buf, "redeliver"), getLong(buf, "doneAbove")));
+                            getLong(buf, "logEnd"), getInt(buf, "inFlight"), getInt(buf, "redeliver"), getLong(buf, "doneAbove"), getInt(buf, "dead")));
                 }
-                yield new QueueDescribeResponse(topic, lease, parts);
+                yield new QueueDescribeResponse(topic, lease, maxAttempts, base, max, parts);
+            }
+            case QUEUE_DEAD_LIST -> {
+                int total = getInt(buf, "total");
+                int count = getCount(buf, 4 + 8 + 4 + 4 + 8 + 2 + 4 + 4, "dead message");
+                List<QueueDeadListResponse.DeadMessage> items = new ArrayList<>(count);
+                for (int i = 0; i < count; i++) {
+                    int partition = getInt(buf, "partition");
+                    long offset = getLong(buf, "offset");
+                    int attempts = getInt(buf, "attempts");
+                    int failures = getInt(buf, "failures");
+                    long deadAt = getLong(buf, "deadAt");
+                    String reason = getString(buf, "reason");
+                    int keyLength = getInt(buf, "keyLength");
+                    if (keyLength < -1) {
+                        throw new ProtocolException("bad keyLength " + keyLength);
+                    }
+                    byte[] k = keyLength == -1 ? null : getBytes(buf, keyLength, "key");
+                    int valueLength = getInt(buf, "valueLength");
+                    if (valueLength < 0) {
+                        throw new ProtocolException("bad valueLength " + valueLength);
+                    }
+                    items.add(new QueueDeadListResponse.DeadMessage(partition, offset, attempts, failures, deadAt, reason, k, getBytes(buf, valueLength, "value")));
+                }
+                yield new QueueDeadListResponse(total, items);
             }
             default -> throw new IllegalArgumentException("not a queue api: " + key);
         };

@@ -1,6 +1,7 @@
 package com.ember.replication;
 
 import com.ember.protocol.ErrorCode;
+import com.ember.protocol.QueueDeadListResponse;
 import com.ember.protocol.QueueDescribeResponse;
 import com.ember.protocol.QueueHandle;
 import com.ember.protocol.QueueMessage;
@@ -53,6 +54,9 @@ public final class AckCoordinator {
         }
     }
 
+    public record DeadListResult(ErrorCode error, int total, List<QueueDeadListResponse.DeadMessage> items) {
+    }
+
     public record CreateResult(ErrorCode error, int partitions) {
     }
 
@@ -101,6 +105,11 @@ public final class AckCoordinator {
     // ------------------------------------------------------------------ CREATE
 
     public CreateResult create(String subscription, String topic, boolean fromStart, int leaseMs) {
+        return create(subscription, topic, fromStart, leaseMs, 0, 0, 0);
+    }
+
+    /** maxAttempts / backoff values of 0 mean the defaults. */
+    public CreateResult create(String subscription, String topic, boolean fromStart, int leaseMs, int maxAttempts, int backoffBaseMs, int backoffMaxMs) {
         ErrorCode leader = checkLeader();
         if (leader != ErrorCode.NONE) {
             return new CreateResult(leader, 0);
@@ -116,7 +125,10 @@ public final class AckCoordinator {
         for (int p = 0; p < partitions; p++) {
             starts.add(fromStart ? data.logStart(topic, p) : data.logEnd(topic, p));
         }
-        Object result = proposeAndWait(AckCommands.encode(new AckCommands.Create(subscription, topic, leaseMs > 0 ? leaseMs : config.defaultLeaseMs(), starts)));
+        int base = backoffBaseMs > 0 ? backoffBaseMs : AckCommands.DEFAULT_BACKOFF_BASE_MS;
+        int max = backoffMaxMs > 0 ? backoffMaxMs : Math.max(AckCommands.DEFAULT_BACKOFF_MAX_MS, base);
+        Object result = proposeAndWait(AckCommands.encode(new AckCommands.Create(subscription, topic, leaseMs > 0 ? leaseMs : config.defaultLeaseMs(), starts,
+                maxAttempts > 0 ? maxAttempts : AckCommands.DEFAULT_MAX_ATTEMPTS, base, max)));
         if (result == AckStateMachine.Result.OK) {
             return new CreateResult(ErrorCode.NONE, partitions);
         }
@@ -215,7 +227,7 @@ public final class AckCoordinator {
             List<QueueHandle> lost = new ArrayList<>();
             List<Long> redeliverOffsets = new ArrayList<>();
 
-            for (AckStateMachine.Redelivery r : state.redeliveries(subscription, p, remaining)) {
+            for (AckStateMachine.Redelivery r : state.redeliveries(subscription, p, remaining, wallClock.getAsLong())) {
                 if (remaining <= 0 || bytes >= bytesLeft) {
                     break;
                 }
@@ -284,6 +296,66 @@ public final class AckCoordinator {
         return new SettleResult(errorOf(result), 0, 0);
     }
 
+    // ------------------------------------------------------------------ NACK and the dead-letter set
+
+    /** The worker could not process these: retry after a backoff, or dead-letter once the attempts are used up. */
+    public SettleResult nack(String subscription, String worker, String reason, List<QueueHandle> handles) {
+        ErrorCode leader = checkLeader();
+        if (leader != ErrorCode.NONE) {
+            return new SettleResult(leader, 0, 0);
+        }
+        if (state.view(subscription) == null) {
+            return new SettleResult(ErrorCode.UNKNOWN_SUBSCRIPTION, 0, 0);
+        }
+        if (handles.isEmpty()) {
+            return new SettleResult(ErrorCode.NONE, 0, 0);
+        }
+        Object result = proposeAndWait(AckCommands.encode(new AckCommands.Nack(subscription, worker, wallClock.getAsLong(), reason, handles)));
+        return result instanceof AckStateMachine.SettleOutcome o ? new SettleResult(ErrorCode.NONE, o.settled(), o.rejected())
+                : new SettleResult(errorOf(result), 0, 0);
+    }
+
+    /** The dead-lettered messages with their content (empty content if retention already removed the record). */
+    public DeadListResult deadList(String subscription, int max) {
+        ErrorCode leader = checkLeader();
+        if (leader != ErrorCode.NONE) {
+            return new DeadListResult(leader, 0, List.of());
+        }
+        AckStateMachine.SubscriptionView v = state.view(subscription);
+        if (v == null) {
+            return new DeadListResult(ErrorCode.UNKNOWN_SUBSCRIPTION, 0, List.of());
+        }
+        List<QueueDeadListResponse.DeadMessage> items = new ArrayList<>();
+        for (AckStateMachine.DeadView d : state.deadLetters(subscription, max)) {
+            LogRecord rec = null;
+            try {
+                rec = data.read(v.topic(), d.partition(), d.offset());
+            } catch (IOException e) {
+                LOG.log(System.Logger.Level.WARNING, nodeLabel + ": reading a dead message failed", e);
+            }
+            items.add(new QueueDeadListResponse.DeadMessage(d.partition(), d.offset(), d.attempts(), d.failures(), d.deadAt(), d.reason(),
+                    rec == null ? null : rec.key(), rec == null ? new byte[0] : rec.value()));
+        }
+        return new DeadListResult(ErrorCode.NONE, state.deadCount(subscription), items);
+    }
+
+    /** type is AckCommands.DEAD_RETRY (back into the queue with a fresh failure count) or DEAD_DISCARD (finished for good). */
+    public SettleResult deadAction(byte type, String subscription, List<QueueHandle> handles) {
+        ErrorCode leader = checkLeader();
+        if (leader != ErrorCode.NONE) {
+            return new SettleResult(leader, 0, 0);
+        }
+        if (state.view(subscription) == null) {
+            return new SettleResult(ErrorCode.UNKNOWN_SUBSCRIPTION, 0, 0);
+        }
+        if (handles.isEmpty()) {
+            return new SettleResult(ErrorCode.NONE, 0, 0);
+        }
+        Object result = proposeAndWait(AckCommands.encode(new AckCommands.DeadAction(type, subscription, handles)));
+        return result instanceof AckStateMachine.SettleOutcome o ? new SettleResult(ErrorCode.NONE, o.settled(), o.rejected())
+                : new SettleResult(errorOf(result), 0, 0);
+    }
+
     // ------------------------------------------------------------------ DESCRIBE
 
     public DescribeResult describe(String subscription) {
@@ -298,9 +370,9 @@ public final class AckCoordinator {
         List<QueueDescribeResponse.PartitionState> parts = new ArrayList<>();
         for (AckStateMachine.PartitionView p : v.partitions()) {
             parts.add(new QueueDescribeResponse.PartitionState(p.partition(), p.floor(), p.next(), data.logEnd(v.topic(), p.partition()),
-                    p.inFlight(), p.redeliver(), p.doneAbove()));
+                    p.inFlight(), p.redeliver(), p.doneAbove(), p.dead()));
         }
-        return new DescribeResult(ErrorCode.NONE, new QueueDescribeResponse(v.topic(), v.leaseMs(), parts));
+        return new DescribeResult(ErrorCode.NONE, new QueueDescribeResponse(v.topic(), v.leaseMs(), v.maxAttempts(), v.backoffBaseMs(), v.backoffMaxMs(), parts));
     }
 
     // ------------------------------------------------------------------ lease expiry
