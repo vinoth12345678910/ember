@@ -39,7 +39,7 @@ final class AppStore {
             return Json.obj("id", id, "name", name, "description", description, "produceTopics", produce, "consumeTopics", consume,
                     "disabled", disabled, "createdAt", createdAt, "keyPrefix", keyPrefix,
                     "lastSeen", stats == null ? 0 : stats.lastSeen.get(), "produced", stats == null ? 0 : stats.produced.get(),
-                    "fetched", stats == null ? 0 : stats.fetched.get());
+                    "fetched", stats == null ? 0 : stats.fetched.get(), "acked", stats == null ? 0 : stats.acked.get());
         }
     }
 
@@ -48,6 +48,7 @@ final class AppStore {
         final AtomicLong lastSeen = new AtomicLong();
         final AtomicLong produced = new AtomicLong();
         final AtomicLong fetched = new AtomicLong();
+        final AtomicLong acked = new AtomicLong();
     }
 
     /** The new app plus its plain-text key, which exists only in this object. */

@@ -7,7 +7,9 @@ import com.ember.client.FetchResult;
 import com.ember.client.PartitionView;
 import com.ember.client.RecordMetadata;
 import com.ember.protocol.ClusterMetadataResponse;
+import com.ember.protocol.ApiKey;
 import com.ember.protocol.QueueDeadListResponse;
+import com.ember.protocol.QueueMessage;
 import com.ember.protocol.QueueHandle;
 import com.ember.storage.LogRecord;
 
@@ -30,10 +32,15 @@ import java.util.Map;
 final class BrokerGateway implements AutoCloseable {
 
     private static final int FETCH_BYTES = 512 * 1024;
+    private static final int QUEUE_CONNECTIONS = 16;
+    static final int MAX_WAIT_MS = 25_000;
 
     private final List<String> adminAddresses;
     private final ClusterClient client;
     private final BatchingProducer producer;
+    private final java.util.concurrent.BlockingQueue<ClusterClient> queueClients = new java.util.concurrent.LinkedBlockingQueue<>();
+    private final List<ClusterClient> allQueueClients = new ArrayList<>();
+    private final Map<String, Object[]> topicOfQueue = new java.util.concurrent.ConcurrentHashMap<>();     // queue -> {topic, expiresAtMillis}
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
 
     BrokerGateway(List<String> bootstrap, List<String> adminAddresses) {
@@ -45,6 +52,11 @@ final class BrokerGateway implements AutoCloseable {
         ClientConfig config = ClientConfig.defaults().withBootstrap(bootstrap).withAutoCreate(false, 3).withTimeouts(2_000, 8_000);
         this.client = new ClusterClient(config);
         this.producer = new BatchingProducer(config, producerSettings);
+        for (int i = 0; i < QUEUE_CONNECTIONS; i++) {                // one blocking client per concurrent queue call: a single shared client would serialise every worker
+            ClusterClient c = new ClusterClient(config);
+            allQueueClients.add(c);
+            queueClients.add(c);
+        }
     }
 
     // ------------------------------------------------------------------ data path
@@ -167,6 +179,86 @@ final class BrokerGateway implements AutoCloseable {
         }
     }
 
+    // ------------------------------------------------------------------ ack queues (apps)
+
+    private <T> T withQueueClient(QueueCall<T> call) throws IOException {
+        ClusterClient c;
+        try {
+            c = queueClients.take();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted", e);
+        }
+        try {
+            return call.run(c);
+        } finally {
+            queueClients.add(c);
+        }
+    }
+
+    private interface QueueCall<T> {
+        T run(ClusterClient c) throws IOException;
+    }
+
+    /** The topic a queue reads (cached for 30 s: it never changes for a queue). Throws EmberException(UNKNOWN_SUBSCRIPTION) if there is no such queue. */
+    String queueTopic(String queue) throws IOException {
+        Object[] cached = topicOfQueue.get(queue);
+        long now = System.currentTimeMillis();
+        if (cached != null && (long) cached[1] > now) {
+            return (String) cached[0];
+        }
+        String topic = withQueueClient(c -> c.queueDescribe(queue)).topic();
+        topicOfQueue.put(queue, new Object[]{topic, now + 30_000});
+        return topic;
+    }
+
+    Map<String, Object> queueDescribe(String queue) throws IOException {
+        var d = withQueueClient(c -> c.queueDescribe(queue));
+        List<Object> parts = new ArrayList<>();
+        long waiting = 0, inFlight = 0, retrying = 0, dead = 0;
+        for (var p : d.partitions()) {
+            parts.add(Json.obj("partition", p.partition(), "floor", p.floor(), "next", p.next(), "logEnd", p.logEnd(), "inFlight", p.inFlight(),
+                    "retrying", p.redeliver(), "dead", p.dead()));
+            waiting += Math.max(0, p.logEnd() - p.next());
+            inFlight += p.inFlight();
+            retrying += p.redeliver();
+            dead += p.dead();
+        }
+        return Json.obj("queue", queue, "topic", d.topic(), "leaseMs", d.leaseMs(), "maxAttempts", d.maxAttempts(), "backoffBaseMs", d.backoffBaseMs(),
+                "backoffMaxMs", d.backoffMaxMs(), "waiting", waiting, "inFlight", inFlight, "retrying", retrying, "dead", dead, "partitions", parts);
+    }
+
+    /**
+     * Claims up to max messages. When none are available it keeps looking for up to waitMs (long polling), without holding a broker connection
+     * while it waits, so thousands of idle workers cost threads but not connections.
+     */
+    List<Object> queueClaim(String queue, String worker, int max, int leaseMs, int waitMs) throws IOException {
+        long deadline = System.nanoTime() + waitMs * 1_000_000L;
+        while (true) {
+            List<QueueMessage> got = withQueueClient(c -> c.queueClaim(queue, worker, max, leaseMs, 4 * 1024 * 1024));
+            if (!got.isEmpty() || System.nanoTime() >= deadline) {
+                List<Object> out = new ArrayList<>(got.size());
+                for (QueueMessage m : got) {
+                    out.add(Json.obj("partition", m.partition(), "offset", m.offset(), "attempt", m.attempt(), "timestamp", m.timestamp(),
+                            "key", m.key() == null ? null : text(m.key()), "value", text(m.value())));
+                }
+                return out;
+            }
+            try {
+                Thread.sleep(Math.max(1, Math.min(100, (deadline - System.nanoTime()) / 1_000_000)));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("interrupted", e);
+            }
+        }
+    }
+
+    Map<String, Object> queueSettle(ApiKey api, String queue, String worker, List<QueueHandle> handles, int leaseMs, String reason) throws IOException {
+        var r = api == ApiKey.QUEUE_NACK ? withQueueClient(c -> c.queueNack(queue, worker, handles, reason))
+                : withQueueClient(c -> c.queueSettle(api, queue, worker, handles, leaseMs));
+        return Json.obj("settled", r.settled(), "rejected", r.rejected());
+    }
+
     // ------------------------------------------------------------------ ack queues (admin)
 
     int createQueue(String name, String topic, boolean fromStart, int leaseMs, int maxAttempts, int backoffMs, int backoffMaxMs) throws IOException {
@@ -245,6 +337,13 @@ final class BrokerGateway implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
+        for (ClusterClient c : allQueueClients) {
+            try {
+                c.close();
+            } catch (IOException ignored) {
+                // closing anyway
+            }
+        }
         producer.close();
         client.close();
     }
