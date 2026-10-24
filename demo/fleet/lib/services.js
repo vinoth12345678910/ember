@@ -8,7 +8,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
  * The dispatcher: a tracker that keeps the latest position of every driver, and a matcher that pairs each ride request with the nearest
  * free driver. Both are ack-queue workers, so a slow or crashing instance never blocks the others and nothing is lost.
  *
- * Tracker: pings are "latest wins": an older ping never moves a driver back, so a replay or a backlog is harmless.
+ * Tracker: pings are "latest wins": the worker option latestWins skips every ping of a driver that is older than a newer one it already has
+ * (a backlog costs one handler call per driver, not one per ping), and the grid still refuses an older timestamp, so a replay is harmless.
  * Matcher: idempotent per ride (a redelivered request is not matched twice); no driver nearby -> RELEASE and try again soon,
  * and after maxWaitMs the ride is reported unmatched instead of waiting forever.
  */
@@ -21,7 +22,7 @@ function startDispatch({ ember, maxKm = 6, maxWaitMs = 15000, trackerConcurrency
   const makeTracker = () => ember.worker('tracker', m => {
     const p = m.json();
     if (grid.update(p.id, p.lat, p.lng, p.ts, p.state)) stats.pings++; else stats.stalePings++;
-  }, { name: 'tracker', concurrency: trackerConcurrency, batchSize: 100, waitMs: 1000, onError: () => {} });
+  }, { name: 'tracker', concurrency: trackerConcurrency, batchSize: 100, waitMs: 1000, latestWins: true, onError: () => {} });
 
   const free = d => {
     const at = reserved.get(d.id);

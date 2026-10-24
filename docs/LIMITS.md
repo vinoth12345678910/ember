@@ -6,7 +6,8 @@ What Ember does not do, what the numbers do not prove, and where the demos cheat
 
 * **At-least-once, not exactly-once**, for topics, consumer groups and ack queues alike. A worker that crashes after doing the work and before acknowledging gets the message again. Ember gives you the **attempt number** (it only grows) and fences stale settles, so a handler can be made idempotent; it cannot make a side effect happen once. The Fleet's billing is safe only because the (mock) bank accepts an idempotency key.
 * No idempotent producer: a produce retried after a timeout can write the record twice.
-* Ordering is per partition. An ack queue deliberately gives up per-partition ordering of *processing* (that is how 24 workers can share 6 partitions); a latest-wins consumer or key-affine worker is the application's job.
+* The Node SDK's `order: 'key'` keeps one key's messages in order inside one worker only, and `latestWins` remembers state per worker in memory; neither is a cluster-wide guarantee.
+* Ordering at the broker is per partition. An ack queue deliberately gives up per-partition ordering of *processing* (that is how 24 workers can share 6 partitions); the SDK options above cover the common single-worker cases.
 
 ## Cluster
 

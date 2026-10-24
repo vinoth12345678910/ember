@@ -51,11 +51,25 @@ export interface WorkerOptions {
   drainMs?: number;
   /** Acks are grouped for this many ms. Default 5. */
   ackDelayMs?: number;
+  /**
+   * "key": messages with the same key are handled one at a time in the order this worker received them, while different keys still run
+   * in parallel (up to `concurrency`). Only within ONE worker: another worker, or a redelivery after a failure, can still run a key's
+   * messages out of order. A hot key holds the slots of its queued messages. Default "none".
+   */
+  order?: 'none' | 'key';
+  /**
+   * Only the newest message (highest offset) of each key is handled; older ones, in the same batch or arriving after a newer one was
+   * handled by this worker, are acknowledged without calling the handler (counted in stats.superseded). For state where the last
+   * value is all that matters (positions, prices, statuses). Messages without a key are always handled.
+   */
+  latestWins?: boolean;
+  /** How many keys' newest handled offset latestWins remembers (least recently used are forgotten). Default 100000. */
+  latestWinsKeys?: number;
   onError?: (error: Error, context: { phase: string; message?: Message }) => void;
 }
 
 export class Worker {
-  stats: { claimed: number; acked: number; nacked: number; released: number; rejected: number };
+  stats: { claimed: number; acked: number; nacked: number; released: number; rejected: number; superseded: number };
   start(): this;
   stop(): Promise<void>;
   /** Chaos helper: act like a dead process (settle nothing; claimed messages come back when their lease runs out). */

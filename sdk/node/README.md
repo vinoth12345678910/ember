@@ -34,6 +34,17 @@ process.on('SIGTERM', () => worker.stop());   // lets running handlers finish, h
 
 Delivery is **at-least-once**: a worker that dies, or runs past its lease, has its messages redelivered (`message.attempt > 1`), so handlers must be safe to repeat.
 
+## Ordering and "last value wins"
+
+```js
+ember.worker('accounts', handler, { order: 'key' });        // same key: one at a time, in arrival order; different keys: in parallel
+ember.worker('positions', handler, { latestWins: true });   // only the newest message of each key is handled; older ones are acked unseen
+```
+
+* `order: 'key'` gives per-key ordering **inside one worker** while keeping the parallelism across keys that a consumer group cannot have beyond its partition count. It is not a global guarantee: a second worker, or a redelivery after a failure, can still run a key's messages out of order. A hot key holds the slots of its queued messages, so size `concurrency` above the number of messages you expect to queue behind one key.
+* `latestWins: true` is for state where only the last value matters (positions, prices, statuses). Within a claimed batch the highest offset of a key wins (the same key is always in the same partition); later, a message older than one this worker already handled for that key is acked without calling your handler (`stats.superseded` counts them). A message that failed is not "handled", so its retry still runs. The newest offset per key is remembered in memory (`latestWinsKeys`, default 100,000, least recently used forgotten), per worker: two workers do not share it, so keep your own timestamp check in the handler if a stale write would hurt (the Fleet tracker does).
+* The options combine.
+
 ## Low-level calls
 
 `ember.claim(queue, {max, waitMs, leaseMs, worker})`, `ember.ack / nack / release / extend(queue, messages, ...)`, `ember.queue(name)` (waiting, inFlight, retrying, dead, retry policy). Types in `index.d.ts`.
