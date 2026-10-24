@@ -26,6 +26,7 @@
         <module>ember-raft</module>
         <module>ember-replication</module>
         <module>ember-chaos</module>
+        <module>ember-web</module>
     </modules>
 
     <dependencyManagement>

@@ -16,6 +16,21 @@ The storage engine, wire protocol, Raft, metrics library, JSON handling and chao
 
 **Tests:** 747 tests, 0 failures (metrics 15, storage 55, raft 182, protocol 97, replication 92, client 39, broker 215, chaos 52), about 5.5 minutes; the `cluster-long` profile adds three 120 s chaos runs.
 
+## Web console (consumer + admin)
+
+`ember-web` is a small Java service plus a no-build browser app: a landing page, sign-in / sign-up, a **consumer** workspace (topics, browse messages, publish, consumer groups) and an **admin** console (live broker and Raft health, create topics, manage users and roles).
+
+```bash
+docker compose up -d --wait
+mvn -q -DskipTests package -pl ember-web -am
+java -jar ember-web/target/ember-web-0.1.0-SNAPSHOT-all.jar \
+  --bootstrap=localhost:19092,localhost:19093,localhost:19094 --admin=localhost:18081,localhost:18082,localhost:18083 \
+  --secret=<long random string> --admin-password=<first admin password>
+# open http://localhost:8088
+```
+
+Anyone can register as a consumer; administrators are promoted from the Users page. Passwords are PBKDF2-hashed in `ember-web-data/users.json`; sessions are HMAC-signed tokens (8 h). Serve it behind TLS in real use.
+
 ## Contents
 [Architecture](#architecture) · [Design concepts](#design-concepts) · [Features](#features) · [Quickstart](#quickstart-docker) · [Guarantees](#guarantees-and-non-guarantees) · [Performance](#measured-performance) · [Testing](#how-i-tested-it) · [Failure matrix](#failure-matrix-summary) · [Structure](#project-structure) · [Build and run](#build-and-run) · [Limitations](#known-limitations)
 
