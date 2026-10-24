@@ -11,10 +11,20 @@ public final class ChaosRunner {
 
     /** ratePerSecond: total produce rate (0 = unthrottled). sampleAdmins/samplesCsv: scrape /metrics every 10 s into a CSV (soak runs). */
     public record Config(long seed, long durationMs, int producers, int readers, int consumers, int partitions, Set<Fault> faults,
-                         long minGapMs, long maxGapMs, Path historyFile, double ratePerSecond, List<String> sampleAdmins, Path samplesCsv) {
+                         long minGapMs, long maxGapMs, Path historyFile, double ratePerSecond, List<String> sampleAdmins, Path samplesCsv, int queueWorkers) {
+        public Config(long seed, long durationMs, int producers, int readers, int consumers, int partitions, Set<Fault> faults,
+                      long minGapMs, long maxGapMs, Path historyFile, double ratePerSecond, List<String> sampleAdmins, Path samplesCsv) {
+            this(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, ratePerSecond, sampleAdmins, samplesCsv, 0);
+        }
+
         public Config(long seed, long durationMs, int producers, int readers, int consumers, int partitions, Set<Fault> faults,
                       long minGapMs, long maxGapMs, Path historyFile) {
-            this(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, 0, List.of(), null);
+            this(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, 0, List.of(), null, 0);
+        }
+
+        /** The same run with ack-queue workers (and a paced producer so the queue can keep up). */
+        public Config withQueue(int workers, double ratePerSecond) {
+            return new Config(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, ratePerSecond, sampleAdmins, samplesCsv, workers);
         }
     }
 
@@ -40,6 +50,11 @@ public final class ChaosRunner {
             long deliveries = s.getOrDefault("deliveries", 0L);
             sb.append(String.format("  group deliveries       : %d (%d distinct, %d duplicates = %.2f%%)%n", deliveries, s.getOrDefault("deliveries.distinct", 0L),
                     s.getOrDefault("deliveries.duplicates", 0L), deliveries == 0 ? 0.0 : 100.0 * s.getOrDefault("deliveries.duplicates", 0L) / deliveries));
+            if (s.getOrDefault("queue.claims", 0L) > 0) {
+                sb.append(String.format("  ack queue              : %d claims delivered %d messages (%d redelivered), %d acks accepted, %d nacks, %d releases, %d dead-lettered, %d rejected as fenced%n",
+                        s.getOrDefault("queue.claims", 0L), s.getOrDefault("queue.deliveries", 0L), s.getOrDefault("queue.redeliveries", 0L), s.getOrDefault("queue.acks.accepted", 0L),
+                        s.getOrDefault("queue.nacks", 0L), s.getOrDefault("queue.releases", 0L), s.getOrDefault("queue.dead", 0L), s.getOrDefault("queue.rejected", 0L)));
+            }
             sb.append(String.format("  replica comparisons    : %d%n", s.getOrDefault("replica.checks", 0L)));
             sb.append(String.format("  VIOLATIONS             : %d%n", result.violations().size()));
             if (!trends.isEmpty()) {
@@ -85,7 +100,7 @@ public final class ChaosRunner {
         MetricsSampler sampler = cfg.sampleAdmins().isEmpty() ? null : new MetricsSampler(cfg.sampleAdmins(), 10_000, cfg.samplesCsv());
         if (sampler != null) sampler.start();
         try (Workload workload = new Workload(new Workload.Config(TOPIC, cfg.partitions(), cfg.producers(), cfg.readers(), cfg.consumers(), env.bootstrap(), GROUP,
-                cfg.ratePerSecond()), rec)) {
+                cfg.ratePerSecond(), cfg.queueWorkers(), "chaos-queue-" + suffix), rec)) {
             try {
                 workload.createTopic();
                 workload.start();
@@ -107,6 +122,15 @@ public final class ChaosRunner {
                     }
                 }
                 workload.stopConsumers();
+                if (cfg.queueWorkers() > 0) {
+                    // the queue must settle by itself (leases run out, retries come due), then the operator deploys the fix and retries the dead letters
+                    if (!workload.drainQueue(120_000)) System.err.println("warning: the ack queue did not drain within 120 s; the checker will report what is stuck");
+                    workload.queueFinal(false);
+                    workload.operatorFix();
+                    if (!workload.drainQueue(120_000)) System.err.println("warning: the ack queue did not drain after the fix; the checker will report what is stuck");
+                    workload.queueFinal(true);
+                    workload.stopQueueWorkers();
+                }
                 workload.stopReaders();
                 if (!workload.crashes().isEmpty()) throw new IllegalStateException("a workload thread crashed: " + workload.crashes().get(0), workload.crashes().get(0));
                 if (!collector.awaitConverged(60_000)) {

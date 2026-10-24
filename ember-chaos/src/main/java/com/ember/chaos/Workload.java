@@ -7,10 +7,14 @@ import com.ember.client.EmberException;
 import com.ember.client.EmberGroupConsumer;
 import com.ember.client.FetchResult;
 import com.ember.client.GroupConsumerConfig;
+import com.ember.client.QueueConsumer;
 import com.ember.client.GroupRecord;
 import com.ember.protocol.ErrorCode;
 import com.ember.protocol.Partitioner;
 import com.ember.protocol.PartitionRef;
+import com.ember.protocol.QueueDeadListResponse;
+import com.ember.protocol.QueueDescribeResponse;
+import com.ember.protocol.QueueMessage;
 import com.ember.protocol.ProducerRecord;
 import com.ember.storage.LogRecord;
 
@@ -38,11 +42,20 @@ import static com.ember.chaos.HistoryRecorder.data;
 public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
 
     /** ratePerSecond: total produce rate of all producers (0 = as fast as they can go). */
-    public record Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group, double ratePerSecond) {
+    public record Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group, double ratePerSecond,
+                         int queueWorkers, String queue) {
+        public Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group, double ratePerSecond) {
+            this(topic, partitions, producers, readers, consumers, bootstrap, group, ratePerSecond, 0, null);
+        }
+
         public Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group) {
-            this(topic, partitions, producers, readers, consumers, bootstrap, group, 0);
+            this(topic, partitions, producers, readers, consumers, bootstrap, group, 0, 0, null);
         }
     }
+
+    /** Ack-queue chaos: a subscription with a short lease and 4 attempts, so redelivery and dead-lettering happen within a run. */
+    static final int QUEUE_LEASE_MS = 1500;
+    static final int QUEUE_MAX_ATTEMPTS = 4;
 
     private static final int GROUP_SESSION_MS = 2000;
     private static final int GROUP_HEARTBEAT_MS = 400;
@@ -53,8 +66,13 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
     private final AtomicBoolean stopProducers = new AtomicBoolean();
     private final AtomicBoolean stopReaders = new AtomicBoolean();
     private final AtomicBoolean stopConsumers = new AtomicBoolean();
+    private final AtomicBoolean stopQueue = new AtomicBoolean();
+    private volatile boolean poisonActive = true;                  // flips to false when the operator "deploys the fix"
+    private final List<Thread> queueThreads = new ArrayList<>();
     private final Set<String> acked = ConcurrentHashMap.newKeySet();
     private final Set<String> delivered = ConcurrentHashMap.newKeySet();
+    private final Set<String> queueDelivered = ConcurrentHashMap.newKeySet();
+    private final Set<String> queueAcked = ConcurrentHashMap.newKeySet();
     private final AtomicLong okCount = new AtomicLong();
     private final AtomicLong infoCount = new AtomicLong();
     private final AtomicLong failCount = new AtomicLong();
@@ -79,6 +97,9 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
                 if (e.errorCode() != ErrorCode.TOPIC_ALREADY_EXISTS) throw e;
             }
         }
+        if (config.queueWorkers() > 0) {
+            QueueConsumer.createSubscription(clientConfig.withRetries(40, 100, 500), config.queue(), config.topic(), true, QUEUE_LEASE_MS, QUEUE_MAX_ATTEMPTS, 100, 300);
+        }
     }
 
     public void start() {
@@ -93,6 +114,10 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
         for (int i = 0; i < config.consumers(); i++) {
             String who = "c" + i;
             spawn(consumerThreads, who, () -> consumeLoop(who));
+        }
+        for (int i = 0; i < config.queueWorkers(); i++) {
+            String who = "q" + i;
+            spawn(queueThreads, who, () -> queueLoop(who));
         }
     }
 
@@ -314,6 +339,168 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
         }
     }
 
+    // ------------------------------------------------------------------ ack-queue workers
+
+    /** The behaviour of a worker for one message: a poison message always fails (until the fix), a few workers "die" holding it, a few give it back. */
+    private String decide(Random random, String value) {
+        if (poisonActive && isPoison(value)) return "nack";
+        int roll = random.nextInt(100);
+        if (roll < 3) return "abandon";                                  // the worker dies: nothing is settled, the lease must run out
+        if (roll < 5) return "late-ack";                                 // the worker is slow: it acks after its lease ran out (fenced if someone took over)
+        if (roll < 8) return "release";
+        return "ack";
+    }
+
+    /** Every 47th message of each producer is poison. */
+    static boolean isPoison(String value) {
+        int dash = value.lastIndexOf('-');
+        if (dash < 0) return false;
+        try {
+            return Long.parseLong(value.substring(dash + 1)) % 47 == 3;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private void queueLoop(String process) {
+        Random random = new Random(process.hashCode());
+        try (QueueConsumer q = new QueueConsumer(clientConfig.withRetries(6, 50, 300), config.queue(), process)) {
+            while (!stopQueue.get()) {
+                long op = rec.invoke(process, "claim", data("worker", process, "queue", config.queue()));
+                List<QueueMessage> got;
+                try {
+                    got = q.claim(8);
+                    List<List<Object>> rows = new ArrayList<>();
+                    for (QueueMessage m : got) {
+                        String value = new String(m.value(), StandardCharsets.UTF_8);
+                        rows.add(List.of(m.partition(), m.offset(), m.attempt(), value));
+                        queueDelivered.add(value);
+                    }
+                    rec.complete(op, process, "claim", Outcome.OK, data("messages", rows));
+                } catch (EmberException | IOException e) {
+                    rec.complete(op, process, "claim", Outcome.INFO, data("messages", List.of(), "error", e.toString()));
+                    LockSupport.parkNanos(60_000_000L);
+                    continue;
+                }
+                if (got.isEmpty()) {
+                    LockSupport.parkNanos(30_000_000L);
+                    continue;
+                }
+                for (QueueMessage m : got) {
+                    if (stopQueue.get()) break;
+                    String value = new String(m.value(), StandardCharsets.UTF_8);
+                    LockSupport.parkNanos(1_000_000L);                    // a little work
+                    switch (decide(random, value)) {
+                        case "ack" -> settle(q, process, "ack", m, "");
+                        case "nack" -> settle(q, process, "nack", m, "poison message");
+                        case "release" -> settle(q, process, "release", m, "");
+                        case "late-ack" -> {
+                            LockSupport.parkNanos((QUEUE_LEASE_MS + 400L) * 1_000_000L);
+                            settle(q, process, "ack", m, "");
+                        }
+                        default -> { }                                    // abandon: no settle at all
+                    }
+                }
+            }
+        } catch (IOException ignored) {
+            // closing the client
+        }
+    }
+
+    /** One handle per operation, so the history says exactly which deliveries were accepted. */
+    private void settle(QueueConsumer q, String process, String action, QueueMessage m, String reason) {
+        List<Object> handle = List.of(m.partition(), m.offset(), m.attempt());
+        long op = rec.invoke(process, "settle", data("worker", process, "queue", config.queue(), "action", action, "handles", List.of(handle)));
+        try {
+            com.ember.protocol.QueueSettleResponse r = switch (action) {
+                case "ack" -> q.ack(List.of(m));
+                case "nack" -> q.nack(List.of(m), reason);
+                default -> q.release(List.of(m));
+            };
+            rec.complete(op, process, "settle", Outcome.OK, data("settled", r.settled(), "rejected", r.rejected()));
+            if (action.equals("ack") && r.settled() > 0) queueAcked.add(new String(m.value(), StandardCharsets.UTF_8));
+        } catch (EmberException | IOException e) {
+            rec.complete(op, process, "settle", Outcome.INFO, data("error", e.toString()));      // unknown: it may or may not have been applied
+        }
+    }
+
+    /** Waits until nothing is waiting, claimed or retrying (messages that died stay dead). Returns false on timeout. */
+    public boolean drainQueue(long timeoutMs) {
+        long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
+        try (QueueConsumer observer = new QueueConsumer(clientConfig.withRetries(40, 100, 500), config.queue(), "observer")) {
+            while (System.nanoTime() < deadline) {
+                try {
+                    QueueDescribeResponse d = observer.describe();
+                    boolean open = false;
+                    for (QueueDescribeResponse.PartitionState p : d.partitions()) {
+                        if (p.next() < p.logEnd() || p.inFlight() > 0 || p.redeliver() > 0) open = true;
+                    }
+                    if (!open) return true;
+                } catch (EmberException | IOException e) {
+                    // not reachable right now: keep waiting
+                }
+                LockSupport.parkNanos(200_000_000L);
+            }
+        } catch (IOException ignored) {
+            // closing
+        }
+        return false;
+    }
+
+    /** Records the final state of the queue (per-partition progress and the dead-letter list) as one operation. */
+    public void queueFinal(boolean afterFix) throws IOException {
+        long op = rec.invoke("final", "queue-final", data("queue", config.queue(), "afterFix", afterFix));
+        try (QueueConsumer q = new QueueConsumer(clientConfig.withRetries(40, 100, 500), config.queue(), "final")) {
+            QueueDescribeResponse d = q.describe();
+            QueueDeadListResponse dead = q.deadLetters(1000);
+            List<List<Object>> parts = new ArrayList<>();
+            for (QueueDescribeResponse.PartitionState p : d.partitions()) {
+                parts.add(List.of(p.partition(), p.floor(), p.next(), p.logEnd(), p.inFlight(), p.redeliver(), p.doneAbove(), p.dead()));
+            }
+            List<List<Object>> items = new ArrayList<>();
+            for (QueueDeadListResponse.DeadMessage m : dead.items()) {
+                items.add(List.of(m.partition(), m.offset(), m.failures(), new String(m.value(), StandardCharsets.UTF_8)));
+            }
+            rec.complete(op, "final", "queue-final", Outcome.OK, data("partitions", parts, "dead", items, "deadTotal", dead.total(), "maxAttempts", d.maxAttempts()));
+        } catch (EmberException | IOException e) {
+            rec.complete(op, "final", "queue-final", Outcome.INFO, data("error", e.toString()));
+            throw e instanceof IOException io ? io : new IOException(e);
+        }
+    }
+
+    /** The operator deploys the fix (poison messages stop failing) and retries every dead letter. */
+    public int operatorFix() throws IOException {
+        poisonActive = false;
+        try (QueueConsumer q = new QueueConsumer(clientConfig.withRetries(40, 100, 500), config.queue(), "operator")) {
+            QueueDeadListResponse dead = q.deadLetters(1000);
+            if (dead.items().isEmpty()) return 0;
+            List<List<Object>> handles = new ArrayList<>();
+            for (QueueDeadListResponse.DeadMessage m : dead.items()) handles.add(List.of(m.partition(), m.offset(), 0));
+            long op = rec.invoke("operator", "settle", data("worker", "operator", "queue", config.queue(), "action", "dead-retry", "handles", handles));
+            try {
+                var r = q.retryDead(dead.items());
+                rec.complete(op, "operator", "settle", Outcome.OK, data("settled", r.settled(), "rejected", r.rejected()));
+                return r.settled();
+            } catch (EmberException | IOException e) {
+                rec.complete(op, "operator", "settle", Outcome.INFO, data("error", e.toString()));
+                throw e instanceof IOException io ? io : new IOException(e);
+            }
+        }
+    }
+
+    public void stopQueueWorkers() throws InterruptedException {
+        stopQueue.set(true);
+        for (Thread t : queueThreads) t.join(30_000);
+    }
+
+    public Set<String> queueDeliveredValues() {
+        return Set.copyOf(queueDelivered);
+    }
+
+    public Set<String> queueAckedValues() {
+        return Set.copyOf(queueAcked);
+    }
+
     // ------------------------------------------------------------------ final read
 
     /** Reads every partition completely, from its start to its end, as "final" reads. Run on a healed, quiet cluster. */
@@ -348,5 +535,6 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
         stopProducers.set(true);
         stopReaders.set(true);
         stopConsumers.set(true);
+        stopQueue.set(true);
     }
 }

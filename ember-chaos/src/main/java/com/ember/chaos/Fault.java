@@ -4,7 +4,9 @@ import java.util.Locale;
 
 /** The kinds of fault the nemesis can inject (CLIENT_PAUSE acts on a group consumer, the others on brokers). */
 public enum Fault {
-    CRASH_RESTART, PAUSE, ISOLATE, LINK, SLOW_FSYNC, DROP, DELAY, CLIENT_PAUSE;
+    CRASH_RESTART, PAUSE, ISOLATE, LINK, SLOW_FSYNC, DROP, DELAY, CLIENT_PAUSE,
+    /** Kills the broker that currently leads the "__acks" Raft group (falls back to a random broker if the driver cannot tell which one it is). */
+    QUEUE_LEADER_CRASH;
 
     public String label() {
         return name().toLowerCase(Locale.ROOT);
@@ -25,9 +27,10 @@ public enum Fault {
                 case "drop" -> out.add(DROP);
                 case "delay" -> out.add(DELAY);
                 case "client_pause", "client" -> out.add(CLIENT_PAUSE);
+                case "queue_leader", "queue_leader_crash" -> out.add(QUEUE_LEADER_CRASH);
                 case "", "none" -> {
                 }
-                default -> throw new IllegalArgumentException("unknown fault '" + name + "' (crash, pause, isolate, link, slow_fsync, drop, delay, client_pause, all)");
+                default -> throw new IllegalArgumentException("unknown fault '" + name + "' (crash, pause, isolate, link, slow_fsync, drop, delay, client_pause, queue_leader, all)");
             }
         }
         return out;

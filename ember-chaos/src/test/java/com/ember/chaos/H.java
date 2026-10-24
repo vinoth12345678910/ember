@@ -44,6 +44,45 @@ final class H {
         rec.complete(id, member, "commit", outcome, data());
     }
 
+    private static void tick() {
+        java.util.concurrent.locks.LockSupport.parkNanos(2_000);                 // strictly later timestamps, so "after" means after
+    }
+
+    /** rows: {partition, offset, attempt, value} */
+    void claim(String worker, Object[]... rows) {
+        tick();
+        long id = rec.invoke(worker, "claim", data("worker", worker, "queue", "q"));
+        List<List<Object>> messages = new ArrayList<>();
+        for (Object[] r : rows) messages.add(List.of(r));
+        tick();
+        rec.complete(id, worker, "claim", Outcome.OK, data("messages", messages));
+        tick();
+    }
+
+    /** One handle per operation; action is ack, nack or release. settled/rejected as the broker answered. */
+    void settle(String worker, String action, int partition, long offset, long attempt, Outcome outcome, long settled, long rejected) {
+        tick();
+        long id = rec.invoke(worker, "settle", data("worker", worker, "queue", "q", "action", action, "handles", List.of(List.of(partition, offset, attempt))));
+        tick();
+        rec.complete(id, worker, "settle", outcome, outcome == Outcome.OK ? data("settled", settled, "rejected", rejected) : data("error", "timeout"));
+        tick();
+    }
+
+    /** partitions rows: {partition, floor, next, logEnd, inFlight, redeliver, doneAbove, dead}; dead rows: {partition, offset, failures, value} */
+    void queueFinal(boolean afterFix, long maxAttempts, Object[][] partitions, Object[][] dead, long deadTotal) {
+        tick();
+        long id = rec.invoke("final", "queue-final", data("queue", "q", "afterFix", afterFix));
+        List<List<Object>> parts = new ArrayList<>(), deadRows = new ArrayList<>();
+        for (Object[] r : partitions) parts.add(List.of(r));
+        for (Object[] r : dead) deadRows.add(List.of(r));
+        rec.complete(id, "final", "queue-final", Outcome.OK, data("partitions", parts, "dead", deadRows, "deadTotal", deadTotal, "maxAttempts", maxAttempts));
+        tick();
+    }
+
+    void replicaAck(int replica, long digest) {
+        rec.replica(data("scope", "ackstate", "group", "acks", "replica", Integer.toString(replica), "digest", digest));
+    }
+
     void replicaData(String group, int replica, long start, long end, long crc) {
         rec.replica(data("scope", "data", "group", group, "replica", Integer.toString(replica), "start", start, "end", end, "crc", crc));
     }

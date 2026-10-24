@@ -21,8 +21,11 @@ import java.util.concurrent.atomic.AtomicLong;
  *   read     invoke: topic, partition, from, final         complete: records [[offset,key,value]...], start, end, error
  *   poll     invoke: consumer, group                       complete: records [[topic,partition,offset,value]...], generation, joinCount
  *   commit   invoke: group, member, generation, offsets [[topic,partition,offset]...]    complete: error
+ *   claim    invoke: worker, queue                         complete: messages [[partition,offset,attempt,value]...], error
+ *   settle   invoke: worker, queue, action=ack|nack|release|dead-retry, handles [[partition,offset,attempt]...]   complete: settled, rejected, error
+ *   queue-final  invoke: queue, afterFix   complete: partitions [[partition,floor,next,logEnd,inFlight,redeliver,doneAbove,dead]...], dead [[partition,offset,failures,value]...], deadTotal, maxAttempts
  *   nemesis  (single event): fault, target, phase=start|stop
- *   replica  (single event): scope=data|raftlog|groupstate|metastate, group, replica, ...digest fields
+ *   replica  (single event): scope=data|raftlog|groupstate|ackstate|metastate, group, replica, ...digest fields
  */
 public final class HistoryRecorder implements AutoCloseable {
 

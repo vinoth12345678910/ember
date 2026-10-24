@@ -18,7 +18,14 @@ import java.util.TreeMap;
  *  P1 no acknowledged write is lost        P2 no two reads disagree about one offset     P3 no phantom (or failed) writes
  *  P4 offsets unique and increasing        P5 per-key order is kept                       P6 reads never shrink
  *  P7 every acknowledged record reaches the group   P8 commits stay inside the log and no zombie commit is accepted
- *  P9 replicas agree (data logs, Raft logs, group and topic state)
+ *  P9 replicas agree (data logs, Raft logs, group, ack-queue and topic state)
+ *
+ * Ack queues (only checked when the history has queue operations):
+ *  P10 an acknowledged message is never delivered again      P11 no delivery is handed out twice (attempt numbers are unique)
+ *  P12 a stale delivery cannot settle a message another worker holds (fencing)
+ *  P13 nothing is stuck or lost: after the drain every message is finished or dead-lettered, and after the operator's fix nothing is dead
+ *  P14 the dead-letter list agrees with the progress counters and the log, and each entry used up its attempts
+ *  P15 every delivered message is the record that is really in the log
  *
  * It is a test, not a proof: it can only find violations that this history makes visible.
  */
@@ -72,6 +79,7 @@ public final class Checker {
         c.p7GroupDelivery();
         c.p8Commits();
         c.p9ReplicaAgreement();
+        c.queueProperties();
         return new Result(List.copyOf(c.violations), c.stats);
     }
 
@@ -372,11 +380,179 @@ public final class Checker {
                     case "data" -> "P9_DATA_DIVERGENCE";
                     case "raftlog" -> "P9_RAFT_DIVERGENCE";
                     case "metastate" -> "P9_META_STATE_DIVERGENCE";
+                    case "ackstate" -> "P9_ACK_STATE_DIVERGENCE";
                     default -> "P9_GROUP_STATE_DIVERGENCE";
                 };
                 violate(code, key.replace('|', ' ') + ": replicas disagree: " + digests);
             }
         });
         stats.put("replica.checks", (long) byScopeGroup.size());
+    }
+
+    // ------------------------------------------------------------------ ack queues (P10-P15)
+
+    private record Delivery(String msg, long attempt, String value, long invokeTime, long completeTime, String worker) {
+    }
+
+    private record Settle(String msg, String action, long attempt, long settled, long rejected, long invokeTime, long completeTime, boolean ok) {
+    }
+
+    private static String msgKey(Object partition, Object offset) {
+        return ((Number) partition).longValue() + ":" + ((Number) offset).longValue();
+    }
+
+    private void queueProperties() {
+        List<History.Op> claimOps = history.ops("claim");
+        List<History.Op> settleOps = history.ops("settle");
+        if (claimOps.isEmpty() && settleOps.isEmpty()) return;
+
+        List<Delivery> deliveries = new ArrayList<>();
+        long claims = 0;
+        for (History.Op op : claimOps) {
+            if (op.complete() == null || op.outcome() != Outcome.OK) continue;
+            claims++;
+            for (List<Object> row : op.complete().rows("messages")) {
+                deliveries.add(new Delivery(msgKey(row.get(0), row.get(1)), ((Number) row.get(2)).longValue(), (String) row.get(3), op.invoke().timeNanos(),
+                        op.complete().timeNanos(), op.invoke().process()));
+            }
+        }
+        List<Settle> settles = new ArrayList<>();
+        long nacks = 0, releases = 0, rejected = 0, acksAccepted = 0;
+        for (History.Op op : settleOps) {
+            HistoryEvent in = op.invoke();
+            if (op.complete() == null) continue;
+            boolean ok = op.outcome() == Outcome.OK;
+            String action = in.str("action");
+            if (ok) rejected += Math.max(0, op.complete().num("rejected"));
+            List<List<Object>> handles = in.rows("handles");
+            if (handles.size() != 1 || action.equals("dead-retry")) continue;                // exact per-handle reasoning needs one handle per operation
+            List<Object> h = handles.get(0);
+            Settle s = new Settle(msgKey(h.get(0), h.get(1)), action, ((Number) h.get(2)).longValue(), ok ? op.complete().num("settled") : 0, ok ? op.complete().num("rejected") : 0,
+                    in.timeNanos(), op.complete().timeNanos(), ok);
+            settles.add(s);
+            if (ok && s.settled() > 0) {
+                switch (action) {
+                    case "ack" -> acksAccepted++;
+                    case "nack" -> nacks++;
+                    case "release" -> releases++;
+                    default -> { }
+                }
+            }
+        }
+        stats.put("queue.claims", claims);
+        stats.put("queue.deliveries", (long) deliveries.size());
+        stats.put("queue.redeliveries", deliveries.stream().filter(d -> d.attempt() > 1).count());
+        stats.put("queue.acks.accepted", acksAccepted);
+        stats.put("queue.nacks", nacks);
+        stats.put("queue.releases", releases);
+        stats.put("queue.rejected", rejected);
+
+        // P11: a delivery (message + attempt number) is handed out once
+        Map<String, Delivery> seenAttempt = new HashMap<>();
+        for (Delivery d : deliveries) {
+            Delivery before = seenAttempt.putIfAbsent(d.msg() + "#" + d.attempt(), d);
+            if (before != null) {
+                violate("P11_ATTEMPT_REUSED", "message " + d.msg() + " attempt " + d.attempt() + " was delivered to both " + before.worker() + " and " + d.worker());
+            }
+            if (d.attempt() < 1) violate("P11_ATTEMPT_REUSED", "message " + d.msg() + " was delivered with attempt " + d.attempt());
+        }
+
+        // P10: nothing is delivered after an acknowledged ack of it completed
+        Map<String, Long> firstAckDone = new HashMap<>();
+        for (Settle s : settles) {
+            if (s.ok() && s.settled() > 0 && s.action().equals("ack")) firstAckDone.merge(s.msg(), s.completeTime(), Math::min);
+        }
+        for (Delivery d : deliveries) {
+            Long done = firstAckDone.get(d.msg());
+            if (done != null && d.invokeTime() > done) {
+                violate("P10_REDELIVERED_AFTER_ACK", "message " + d.msg() + " (" + d.value() + ") was acknowledged and then delivered again to " + d.worker() + " as attempt " + d.attempt());
+            }
+        }
+
+        // P12: a settle for attempt a is refused once attempt a' > a has been delivered, unless the message was already finished
+        Map<String, List<Delivery>> byMsg = new HashMap<>();
+        for (Delivery d : deliveries) byMsg.computeIfAbsent(d.msg(), k -> new ArrayList<>()).add(d);
+        for (Settle s : settles) {
+            if (!s.ok() || s.settled() < 1) continue;
+            boolean finishedBefore = s.action().equals("ack") && firstAckDone.getOrDefault(s.msg(), Long.MAX_VALUE) < s.invokeTime();
+            if (finishedBefore) continue;                                                   // acking something already finished is an accepted no-op
+            for (Delivery d : byMsg.getOrDefault(s.msg(), List.of())) {
+                if (d.attempt() > s.attempt() && d.completeTime() < s.invokeTime()) {
+                    violate("P12_FENCED_SETTLE_ACCEPTED", "message " + s.msg() + ": " + s.action() + " of attempt " + s.attempt() + " was accepted although attempt " + d.attempt()
+                            + " had already been delivered to " + d.worker());
+                    break;
+                }
+            }
+        }
+
+        // P15: what was delivered is what the log holds
+        String topic = produces.isEmpty() ? null : produces.get(0).topic();
+        Set<String> possible = new HashSet<>();
+        for (Produce p : produces) if (p.outcome() != Outcome.FAIL) possible.add(p.value());
+        for (Delivery d : deliveries) {
+            if (!possible.contains(d.value())) {
+                violate("P15_PHANTOM_DELIVERY", "value " + d.value() + " was delivered by the queue (" + d.msg() + ") but no produce ever sent it");
+                continue;
+            }
+            if (topic == null) continue;
+            String[] po = d.msg().split(":");
+            TreeMap<Long, Rec> log = finalLog.get(topic + "-" + po[0]);
+            Rec at = log == null ? null : log.get(Long.parseLong(po[1]));
+            if (at != null && !Objects.equals(at.value(), d.value())) {
+                violate("P15_PHANTOM_DELIVERY", "the queue delivered " + d.value() + " as " + d.msg() + " but the log holds " + at.value() + " there");
+            }
+        }
+
+        // P13 / P14: the final states
+        List<History.Op> finals = history.ops("queue-final");
+        if (finals.isEmpty()) {
+            if (claims > 0) violate("P13_NO_FINAL_STATE", "the queue was used but its final state was never recorded: stuck messages cannot be ruled out");
+            return;
+        }
+        long deadAtFirstFinal = 0;
+        for (History.Op op : finals) {
+            if (op.complete() == null || op.outcome() != Outcome.OK) {
+                violate("P13_NO_FINAL_STATE", "the final state of the queue could not be read");
+                continue;
+            }
+            HistoryEvent in = op.invoke(), done = op.complete();
+            boolean afterFix = in.flag("afterFix");
+            long deadSum = 0;
+            for (List<Object> row : done.rows("partitions")) {
+                long partition = ((Number) row.get(0)).longValue(), floor = ((Number) row.get(1)).longValue(), next = ((Number) row.get(2)).longValue(),
+                        logEnd = ((Number) row.get(3)).longValue(), inFlight = ((Number) row.get(4)).longValue(), redeliver = ((Number) row.get(5)).longValue(),
+                        doneAbove = ((Number) row.get(6)).longValue(), dead = ((Number) row.get(7)).longValue();
+                String where = "partition " + partition + (afterFix ? " after the fix" : " after the drain");
+                deadSum += dead;
+                if (next != logEnd) violate("P13_UNCLAIMED", where + ": the log ends at " + logEnd + " but only " + next + " offsets were ever handed out");
+                if (inFlight > 0 || redeliver > 0) violate("P13_STUCK", where + ": " + inFlight + " still claimed and " + redeliver + " still waiting to be redelivered");
+                if (inFlight == 0 && redeliver == 0 && next - floor != doneAbove + dead) {
+                    violate("P13_UNACCOUNTED", where + ": " + (next - floor) + " offsets above the floor, but only " + doneAbove + " finished and " + dead + " dead-lettered");
+                }
+                if (afterFix && dead > 0) violate("P13_DEAD_AFTER_FIX", where + ": " + dead + " messages are still dead-lettered after the fix and the operator's retry");
+            }
+            if (!afterFix) {
+                deadAtFirstFinal = done.num("deadTotal");
+                stats.put("queue.dead", deadAtFirstFinal);
+            }
+            if (done.num("deadTotal") != deadSum) {
+                violate("P14_DEAD_COUNT", "the dead-letter list says " + done.num("deadTotal") + " but the partitions count " + deadSum);
+            }
+            if (done.rows("dead").size() != Math.min(done.num("deadTotal"), 1000)) {
+                violate("P14_DEAD_COUNT", "the dead-letter list returned " + done.rows("dead").size() + " entries for a total of " + done.num("deadTotal"));
+            }
+            long maxAttempts = done.num("maxAttempts");
+            for (List<Object> row : done.rows("dead")) {
+                String tpKey = topic == null ? null : topic + "-" + ((Number) row.get(0)).longValue();
+                long failures = ((Number) row.get(2)).longValue();
+                String value = (String) row.get(3);
+                if (failures < maxAttempts) violate("P14_DEAD_EARLY", "message " + row.get(0) + ":" + row.get(1) + " (" + value + ") is dead-lettered after only " + failures + " failures (limit " + maxAttempts + ")");
+                TreeMap<Long, Rec> log = tpKey == null ? null : finalLog.get(tpKey);
+                Rec at = log == null ? null : log.get(((Number) row.get(1)).longValue());
+                if (at != null && !Objects.equals(at.value(), value)) {
+                    violate("P14_DEAD_CONTENT", "the dead letter " + row.get(0) + ":" + row.get(1) + " shows " + value + " but the log holds " + at.value());
+                }
+            }
+        }
     }
 }

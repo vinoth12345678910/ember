@@ -15,6 +15,14 @@ public final class InProcessDriver implements FaultDriver {
     }
 
     @Override
+    public int queueLeader() {
+        for (int i = 1; i <= cluster.n; i++) {
+            if (cluster.isUp(i) && cluster.server(i).replicaManager().acksGroup().isLeader()) return i;
+        }
+        return -1;
+    }
+
+    @Override
     public boolean supports(Fault fault) {
         return fault != Fault.CLIENT_PAUSE;
     }
