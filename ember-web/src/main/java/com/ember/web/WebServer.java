@@ -28,6 +28,7 @@ final class WebServer implements AutoCloseable {
     private static final Pattern APP_MESSAGES = Pattern.compile("/api/app/topics/([^/]+)/messages");
     private static final Pattern MESSAGES = Pattern.compile("/api/topics/([^/]+)/messages");
     private static final Pattern USER = Pattern.compile("/api/admin/users/([^/]+)");
+    private static final Pattern APP_QUEUE = Pattern.compile("/api/app/queues/([^/]+)(?:/(claim|ack|nack|release|extend))?");
     private static final Pattern QUEUE_DEAD = Pattern.compile("/api/admin/queues/([^/]+)/dead(?:/(retry|discard))?");
     private static final Pattern APP = Pattern.compile("/api/admin/apps/([^/]+)(/rotate-key)?");
 
@@ -57,6 +58,8 @@ final class WebServer implements AutoCloseable {
     static {
         // The JDK server closes idle keep-alive connections beyond 200 by default; thousands of clients would see resets.
         System.setProperty("sun.net.httpserver.maxIdleConnections", System.getProperty("sun.net.httpserver.maxIdleConnections", "20000"));
+        // The JDK server writes headers and body separately; with Nagle on, the second write waits for the client's delayed ACK (~40 ms per response).
+        System.setProperty("sun.net.httpserver.nodelay", System.getProperty("sun.net.httpserver.nodelay", "true"));
     }
 
     WebServer(String host, int port, UserStore users, AppStore apps, Tokens tokens, BrokerGateway gateway, Clock clock) throws IOException {
@@ -250,7 +253,56 @@ final class WebServer implements AutoCloseable {
                 return r;
             }
         }
+        Matcher q = APP_QUEUE.matcher(path);
+        if (q.matches()) {
+            return appQueue(app, URLDecoder.decode(q.group(1), StandardCharsets.UTF_8), q.group(2), method, body(ex, method));
+        }
         throw new ApiException(404, "no such endpoint");
+    }
+
+    /**
+     * Ack-queue access for a registered app. The app may only touch queues that read a topic it may consume. Each worker name is prefixed with
+     * the app's id before it reaches the broker, so one app can never ack, nack or extend another app's messages, whatever it sends.
+     */
+    private Object appQueue(AppStore.App app, String queue, String op, String method, Map<String, Object> b) throws IOException {
+        checkTopic(queue);
+        String topic = gateway.queueTopic(queue);
+        if (!app.canConsume(topic)) throw new ApiException(403, "this app may not consume from '" + topic + "'");
+        AppStore.Stats stats = apps.stats(app.id());
+        if (op == null) {
+            if (!method.equals("GET")) throw new ApiException(405, "GET only");
+            return gateway.queueDescribe(queue);
+        }
+        if (!method.equals("POST")) throw new ApiException(405, "POST only");
+        String name = b.get("worker") == null ? "default" : str(b, "worker");
+        if (!WORKER.matcher(name).matches()) throw new ApiException(400, "worker names use letters, digits, . _ - (max 64)");
+        String worker = app.id() + ":" + name;
+        if (op.equals("claim")) {
+            int max = b.get("max") == null ? 10 : ((Number) b.get("max")).intValue();
+            int lease = intOf(b, "leaseMs");
+            int wait = intOf(b, "waitMs");
+            if (max < 1 || max > MAX_BATCH) throw new ApiException(400, "max must be 1-" + MAX_BATCH);
+            List<Object> messages = gateway.queueClaim(queue, worker, max, lease, Math.min(wait, BrokerGateway.MAX_WAIT_MS));
+            stats.fetched.addAndGet(messages.size());
+            return Json.obj("messages", messages);
+        }
+        if (!(b.get("handles") instanceof List<?> list) || list.size() > MAX_BATCH) throw new ApiException(400, "handles must hold at most " + MAX_BATCH + " entries");
+        List<com.ember.protocol.QueueHandle> handles = new java.util.ArrayList<>(list.size());
+        for (Object o : list) {
+            Map<?, ?> h = (Map<?, ?>) o;
+            handles.add(new com.ember.protocol.QueueHandle(((Number) h.get("partition")).intValue(), ((Number) h.get("offset")).longValue(), ((Number) h.get("attempt")).intValue()));
+        }
+        String reason = b.get("reason") == null ? "" : str(b, "reason");
+        if (reason.getBytes(StandardCharsets.UTF_8).length > 400) reason = reason.substring(0, 200);
+        com.ember.protocol.ApiKey api = switch (op) {
+            case "ack" -> com.ember.protocol.ApiKey.QUEUE_ACK;
+            case "nack" -> com.ember.protocol.ApiKey.QUEUE_NACK;
+            case "release" -> com.ember.protocol.ApiKey.QUEUE_RELEASE;
+            default -> com.ember.protocol.ApiKey.QUEUE_EXTEND;
+        };
+        Map<String, Object> result = gateway.queueSettle(api, queue, worker, handles, intOf(b, "leaseMs"), reason);
+        if (api == com.ember.protocol.ApiKey.QUEUE_ACK) stats.acked.addAndGet(((Number) result.get("settled")).longValue());
+        return result;
     }
 
     private Object registerApp(Map<String, Object> b, long now) throws AppStore.AppException, IOException {
@@ -373,6 +425,7 @@ final class WebServer implements AutoCloseable {
     }
 
     private static final int MAX_BATCH = 500;
+    private static final Pattern WORKER = Pattern.compile("[a-zA-Z0-9._-]{1,64}");
 
     /** One record {"key","value"} or a batch {"records":[{"key","value"},...]} (up to 500). */
     private Object produce(String topic, Map<String, Object> b) throws IOException {
@@ -409,6 +462,10 @@ final class WebServer implements AutoCloseable {
     private static String str(Map<String, Object> m, String key) {
         Object v = m.get(key);
         return v == null ? null : (String) v;
+    }
+
+    private static Map<String, Object> body(HttpExchange ex, String method) throws IOException {
+        return method.equals("GET") ? Map.of() : body(ex);
     }
 
     private static Map<String, Object> body(HttpExchange ex) throws IOException {

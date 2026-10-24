@@ -1,0 +1,11 @@
+{
+  "name": "@ember/sdk",
+  "version": "0.1.0",
+  "description": "Publish to Ember and run workers on ack queues (claim, ack, nack, retry, dead-letter) over HTTP. No dependencies.",
+  "main": "ember-sdk.js",
+  "types": "index.d.ts",
+  "license": "MIT",
+  "engines": { "node": ">=18" },
+  "files": ["ember-sdk.js", "index.d.ts", "README.md"],
+  "scripts": { "test": "node --test" }
+}
