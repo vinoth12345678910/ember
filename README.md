@@ -31,6 +31,18 @@ java -jar ember-web/target/ember-web-0.1.0-SNAPSHOT-all.jar \
 
 Anyone can register as a consumer; administrators are promoted from the Users page. Passwords are PBKDF2-hashed in `ember-web-data/users.json`; sessions are HMAC-signed tokens (8 h). Serve it behind TLS in real use.
 
+### Registering an app
+
+Services connect to Ember through the console with an API key, not with a user login. As an admin open **Apps, Register app**, give it a name and the topics it may produce to and consume from (exact names, a prefix such as `ride-*`, or `*`). The key is shown once and stored only as a hash; **New key** replaces it and revokes the old one at once.
+
+```bash
+curl -X POST http://localhost:8088/api/app/topics/orders/messages -H "Authorization: Bearer emb_..." -d '{"key":"k1","value":"hello"}'
+curl "http://localhost:8088/api/app/topics/orders/messages?partition=0&offset=0&limit=50" -H "Authorization: Bearer emb_..."
+curl http://localhost:8088/api/app/me -H "Authorization: Bearer emb_..."
+```
+
+The brokers themselves still have no authentication: the permission check lives in the console, so keep the broker ports private and let apps reach Ember only through it.
+
 ## Contents
 [Architecture](#architecture) · [Design concepts](#design-concepts) · [Features](#features) · [Quickstart](#quickstart-docker) · [Guarantees](#guarantees-and-non-guarantees) · [Performance](#measured-performance) · [Testing](#how-i-tested-it) · [Failure matrix](#failure-matrix-summary) · [Structure](#project-structure) · [Build and run](#build-and-run) · [Limitations](#known-limitations)
 
