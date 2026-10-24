@@ -40,6 +40,7 @@ public final class EmberCli {
               metadata     [--topic=t]
               bench        [--topic=t] [--partitions=3] [--producers=1] [--records=200000] [--value-bytes=100] [--batch=500]
                            [--warmup-records=0] [--rate=N records/s total (fixed-rate mode; default closed loop)] [--csv=FILE] [--acks-timeout=MS]
+                           [--pipeline=N parallel connections per producer: sends a batch's partitions at the same time]
               cluster status  --admin=h1:p1,h2:p2     (nodes, readiness, controller, coordinator, role of every node in every Raft group)
               cluster metrics --admin=h:p [--filter=ember_raft]
               healthcheck  [--admin=localhost:8080]   (exit 0 only when /health/ready is 200)""";

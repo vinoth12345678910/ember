@@ -31,6 +31,28 @@ java -jar ember-web/target/ember-web-0.1.0-SNAPSHOT-all.jar \
 
 Anyone can register as a consumer; administrators are promoted from the Users page. Passwords are PBKDF2-hashed in `ember-web-data/users.json`; sessions are HMAC-signed tokens (8 h). Serve it behind TLS in real use.
 
+### Publishing at scale
+
+The console gateway publishes through a shared batching producer: many HTTP requests at once are collected into a few pipelined batches, and the partitions of each batch are sent in parallel over several broker connections. Requests are served on virtual threads, so thousands of publishers can wait for their acknowledgement at the same time.
+
+* One call may carry up to 500 records: `{"records":[{"key":"a","value":"..."},...]}` returns `{"results":[{"partition":2,"offset":41},...]}` in input order (a record that failed carries an `error`).
+* Back-pressure: when the producer queue is full the gateway answers **503** with `Retry-After: 1` instead of buffering without limit. Tune with `--producer-connections` (default 8) and `--producer-queue` (default 20000).
+* Order is kept per key. Delivery is at-least-once, so a retry after a timeout can duplicate a record.
+* `GET /api/admin/cluster` also returns the gateway's producer counters (acknowledged, failed, rejected, batches, queued, average batch).
+* For Java code: `EmberProducer.pipelined(config, connections)` and `BatchingProducer`; `bench --pipeline=N` measures the first.
+
+Measured on a cloud sandbox VM (3 brokers, fsync on, everything on one disk), Node load generator on the same machine, 6 partitions, 100-byte values, 15 s runs. Treat these as one setup, not a promise:
+
+| Gateway | Concurrent publishers | Calls carry | Messages/s | p50 | p99 | Errors |
+|---|---|---|---|---|---|---|
+| before (8 threads, one shared synchronous producer) | 200 | 1 record | 495 | 376 ms | 720 ms | 0 |
+| after | 200 | 1 record | 2,986 | 61 ms | 136 ms | 0 |
+| after | 1,000 | 1 record | 4,448 | 208 ms | 689 ms | 0 |
+| after | 3,000 | 1 record | 4,060 | 669 ms | 2,125 ms | 0 |
+| after | 100 | 50 records | 50,334 | 92 ms | 150 ms | 0 |
+
+`bench` (4 producers, batches of 100, 12 partitions): 7,346 records/s with the classic producer, 12,163 with `--pipeline=12`; with 3 partitions the two are within noise (14.8k vs 15.7k).
+
 ### Registering an app
 
 Services connect to Ember through the console with an API key, not with a user login. As an admin open **Apps, Register app**, give it a name and the topics it may produce to and consume from (exact names, a prefix such as `ride-*`, or `*`). The key is shown once and stored only as a hash; **New key** replaces it and revokes the old one at once.
@@ -361,11 +383,11 @@ try (EmberGroupConsumer consumer = new EmberGroupConsumer(config)) {
 
 ## Known limitations
 
-Replication factor = cluster size, with no adding or removing brokers; no Raft snapshots (the Raft log never shrinks and restart replays it); every record is written twice (Raft log + data log); one coordinator for all consumer groups and no compaction of the `__groups` log; eager rebalancing with a non-sticky range assignor; the producer sends one request per partition in sequence (more partitions can mean *lower* single-producer throughput); one advertised address per broker (no multiple listeners); no TLS or authentication; no exactly-once or idempotent producer; no long-poll fetch; the partition count of a topic is fixed and topics cannot be deleted.
+Replication factor = cluster size, with no adding or removing brokers; no Raft snapshots (the Raft log never shrinks and restart replays it); every record is written twice (Raft log + data log); one coordinator for all consumer groups and no compaction of the `__groups` log; eager rebalancing with a non-sticky range assignor; the default producer sends one request per partition in sequence (more partitions can mean *lower* single-producer throughput; `EmberProducer.pipelined` sends them in parallel); one advertised address per broker (no multiple listeners); no TLS or authentication; no exactly-once or idempotent producer; no long-poll fetch; the partition count of a topic is fixed and topics cannot be deleted.
 
 ## What I would build next
 
-Raft snapshots and log compaction; an idempotent producer (removes the duplicate caveat); a pipelining producer; sharded group coordinators; cooperative rebalancing and a sticky assignor; adding and removing brokers; tiered storage; TLS and authentication.
+Raft snapshots and log compaction; an idempotent producer (removes the duplicate caveat); pipelining across batches (today's pipelining is across the partitions of one batch); sharded group coordinators; cooperative rebalancing and a sticky assignor; adding and removing brokers; tiered storage; TLS and authentication.
 
 ## What I learned
 
