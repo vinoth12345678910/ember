@@ -574,7 +574,7 @@ async function adminApps(view, _a, _p, alive) {
       `<div class="panel">${apps.length ? `<div class="table-wrap"><table><thead><tr><th>App</th><th>Can produce to</th><th>Can consume from</th><th>Key</th><th>Activity</th><th></th></tr></thead><tbody>
       ${apps.map(a => `<tr><td><b>${esc(a.name)}</b> ${a.disabled ? '<span class="badge bad">disabled</span>' : ''}<div class="hint">${esc(a.description)}</div><div class="hint mono">${esc(a.id)}</div></td>
         <td>${pills(a.produceTopics)}</td><td>${pills(a.consumeTopics)}</td><td class="mono">${esc(a.keyPrefix)}…</td>
-        <td class="hint">${num(a.produced)} sent<br>${num(a.fetched)} read<br>${a.lastSeen ? 'seen ' + esc(new Date(a.lastSeen).toLocaleTimeString()) : 'never connected'}</td>
+        <td class="hint">${num(a.produced)} sent<br>${num(a.fetched)} read · ${num(a.acked)} acked<br>${a.lastSeen ? 'seen ' + esc(new Date(a.lastSeen).toLocaleTimeString()) : 'never connected'}</td>
         <td><div class="row-actions"><button class="btn sm" data-a="edit" data-i="${esc(a.id)}">Edit</button><button class="btn sm" data-a="rotate" data-i="${esc(a.id)}">New key</button>
         <button class="btn sm" data-a="toggle" data-i="${esc(a.id)}" data-v="${!a.disabled}">${a.disabled ? 'Enable' : 'Disable'}</button><button class="btn sm danger" data-a="delete" data-i="${esc(a.id)}">Delete</button></div></td></tr>`).join('')}
       </tbody></table></div>` : empty('No apps registered', 'Register your first service to get an API key.')}</div>`;

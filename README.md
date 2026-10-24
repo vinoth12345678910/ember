@@ -65,6 +65,22 @@ curl http://localhost:8088/api/app/me -H "Authorization: Bearer emb_..."
 
 The brokers themselves still have no authentication: the permission check lives in the console, so keep the broker ports private and let apps reach Ember only through it.
 
+
+### Apps and the SDK (publish and run workers over HTTP)
+
+Registered apps (see above) use the console's HTTP API with `Authorization: Bearer emb_...`. Apps never see the brokers.
+
+| Call | What it does |
+|---|---|
+| `POST /api/app/topics/{topic}/messages` | publish `{key, value}` or `{records:[...]}` (up to 500) |
+| `POST /api/app/queues/{queue}/claim` | `{max, waitMs, leaseMs, worker}` returns `{messages:[{partition, offset, attempt, timestamp, key, value}]}`; `waitMs` (up to 25 s) long-polls |
+| `POST /api/app/queues/{queue}/ack \| nack \| release \| extend` | `{worker, handles:[{partition, offset, attempt}], reason?, leaseMs?}` returns `{settled, rejected}` |
+| `GET /api/app/queues/{queue}` | waiting, in flight, retrying, dead, retry policy |
+
+A queue is allowed only if the app may consume the queue's topic. The worker name you send is prefixed with the app's id before it reaches the broker, so apps cannot ack, nack or extend each other's messages. The Node SDK ([`sdk/node`](sdk/node/README.md)) wraps this: `ember.worker(queue, handler, {concurrency})` claims, runs handlers, acks or nacks, extends leases of slow handlers and shuts down cleanly. Java code can use `QueueConsumer` directly against the brokers.
+
+Measured on one cloud VM (3 brokers, fsync on, Node workers on the same machine), 20 ms of work per message, 3 workers x 50 concurrent handlers: 20,000 messages in 5.6 s (3,585/s); 5,000 messages of which every 100th is poison: 4,950 handled and 50 dead-lettered after exactly 3 attempts, in 2.6 s. With one of three worker processes `SIGKILL`ed after 1 s, all 3,000 messages were still handled and the 40 that were in flight on the dead process were redelivered (attempt 2). Serving the JDK HTTP server with `TCP_NODELAY` cut a claim/ack round trip from about 50 ms to 11 ms.
+
 ## Ack queues (per-message acknowledgement)
 
 A consumer group tracks one position per partition, so one failing message blocks everything behind it and parallelism stops at the partition count. An **ack queue** tracks each message: a worker *claims* messages, *acks* the ones it finished, and anything not acked before its lease runs out goes to another worker. State lives in its own Raft group (`__acks`), so it survives the loss of a broker; the records stay in the partition logs. Many workers may share one partition. Delivery is at-least-once: a late ack from a worker that lost its lease is rejected.

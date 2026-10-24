@@ -19,6 +19,11 @@ jobs:
       # The "slow" tests (60-120 s chaos runs) are excluded; run them with: mvn -B verify -Pcluster-long
       - name: mvn verify
         run: mvn -B verify
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Node SDK tests
+        run: cd sdk/node && npm test
       - name: Upload test reports when the build fails
         if: failure()
         uses: actions/upload-artifact@v4

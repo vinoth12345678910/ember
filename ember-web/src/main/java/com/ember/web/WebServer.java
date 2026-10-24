@@ -58,6 +58,8 @@ final class WebServer implements AutoCloseable {
     static {
         // The JDK server closes idle keep-alive connections beyond 200 by default; thousands of clients would see resets.
         System.setProperty("sun.net.httpserver.maxIdleConnections", System.getProperty("sun.net.httpserver.maxIdleConnections", "20000"));
+        // The JDK server writes headers and body separately; with Nagle on, the second write waits for the client's delayed ACK (~40 ms per response).
+        System.setProperty("sun.net.httpserver.nodelay", System.getProperty("sun.net.httpserver.nodelay", "true"));
     }
 
     WebServer(String host, int port, UserStore users, AppStore apps, Tokens tokens, BrokerGateway gateway, Clock clock) throws IOException {
