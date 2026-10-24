@@ -113,6 +113,10 @@ With 12,000 messages where every 100th always fails, 8 workers finished all 11,8
 
 Measured on one cloud VM (3 brokers, fsync on): 12,371 messages/s claim+ack with 8 workers; with 100 ms of work per batch on 6 partitions, 6 workers (the consumer-group limit) did 529 messages/s and 24 workers did 1,788 (3.4x). Design, failure behaviour and limits (no Raft snapshots yet, one `__acks` leader), including section 12 on retries and dead letters: [`docs/ack-queue/design.md`](docs/ack-queue/design.md).
 
+## Ember Fleet: a live demo
+
+[`demo/fleet`](demo/fleet/README.md) is a ride-dispatch system built on the pieces above: thousands of simulated drivers and riders, a tracker and matcher, billing against a flaky bank, notifications, each service a separate registered app with its own key. `node bin/scenario.js` runs it with a bank outage, always-declined cards and workers that crash after charging, then checks that every ride was matched and completed, every good card was charged exactly once, and nothing is stuck. With 5,000 drivers pinging every 4 s it sustained 1,242 pings/s, matched 608 rides (p50 181 ms) and passed all checks on one cloud VM.
+
 ## Contents
 [Architecture](#architecture) · [Design concepts](#design-concepts) · [Features](#features) · [Quickstart](#quickstart-docker) · [Guarantees](#guarantees-and-non-guarantees) · [Performance](#measured-performance) · [Testing](#how-i-tested-it) · [Failure matrix](#failure-matrix-summary) · [Structure](#project-structure) · [Build and run](#build-and-run) · [Limitations](#known-limitations)
 

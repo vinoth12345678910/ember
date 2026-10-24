@@ -1,0 +1,12 @@
+{
+  "name": "ember-fleet-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ember Fleet: a live ride-dispatch demo (thousands of simulated drivers and riders) built on Ember ack queues.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "setup": "node bin/setup.js",
+    "scenario": "node bin/scenario.js",
+    "test": "node --test"
+  }
+}
