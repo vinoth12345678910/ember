@@ -118,6 +118,28 @@ public class EmberClient implements AutoCloseable {
         return (DescribeGroupResponse) call(new DescribeGroupRequest(groupId), (short) 0);
     }
 
+    // ---- ack queues: thin wrappers; routing and retries live in ClusterClient
+
+    public synchronized FindCoordinatorResponse queueFind() throws IOException {
+        return (FindCoordinatorResponse) call(new QueueFindRequest(), (short) 0);
+    }
+
+    public synchronized int queueCreate(String subscription, String topic, boolean fromStart, int leaseMs) throws IOException {
+        return ((QueueCreateResponse) call(new QueueCreateRequest(subscription, topic, fromStart, leaseMs), (short) 0)).partitionCount();
+    }
+
+    public synchronized List<QueueMessage> queueClaim(String subscription, String worker, int maxMessages, int leaseMs, int maxBytes) throws IOException {
+        return ((QueueClaimResponse) call(new QueueClaimRequest(subscription, worker, maxMessages, leaseMs, maxBytes), (short) 0)).messages();
+    }
+
+    public synchronized QueueSettleResponse queueSettle(ApiKey api, String subscription, String worker, List<QueueHandle> handles, int leaseMs) throws IOException {
+        return (QueueSettleResponse) call(new QueueSettleRequest(api, subscription, worker, handles, leaseMs), (short) 0);
+    }
+
+    public synchronized QueueDescribeResponse queueDescribe(String subscription) throws IOException {
+        return (QueueDescribeResponse) call(new QueueDescribeRequest(subscription), (short) 0);
+    }
+
     private Response call(Request request, short apiVersion) throws IOException {
         int correlationId = nextCorrelationId++;
         byte[] bytes;

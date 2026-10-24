@@ -219,7 +219,7 @@ class AdminServerTest {
             assertEquals(1.0, status.get("nodeId"));
             assertEquals(true, status.get("joined"));
             assertEquals(3, ((List<Object>) status.get("cluster")).size());
-            assertEquals(3 + 2, ((List<Object>) status.get("raftGroups")).size(), "meta + __groups + 3 partitions");
+            assertEquals(3 + 3, ((List<Object>) status.get("raftGroups")).size(), "meta + __groups + __acks + 3 partitions");
             assertEquals(2, ((List<Object>) status.get("peers")).size());
             for (Object g : (List<Object>) status.get("raftGroups")) {
                 Map<String, Object> group = (Map<String, Object>) g;

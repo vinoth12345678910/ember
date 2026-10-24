@@ -140,6 +140,7 @@ final class AdminServer implements AutoCloseable {
         w.name("raftGroups").beginArray();
         raftGroup(w, replicas.metaGroup());
         raftGroup(w, replicas.groupsGroup());
+        raftGroup(w, replicas.acksGroup());
         for (ReplicaManager.TopicState t : replicas.topics()) {
             for (ReplicaManager.PartitionReplica r : t.replicas()) raftGroup(w, r.group());
         }
@@ -166,6 +167,21 @@ final class AdminServer implements AutoCloseable {
             g.members().forEach((memberId, m) -> w.beginObject().name("memberId").value(memberId).name("clientId").value(m.clientId())
                     .name("assignedPartitions").value(m.assigned().size()).endObject());
             w.endArray().name("committedPartitions").value(g.offsets().size()).endObject();
+        }
+        w.endArray();
+
+        w.name("queueLeaderId").value(replicas.ackLeaderId());
+        w.name("subscriptions").beginArray();
+        for (String name : replicas.ackState().names()) {
+            com.ember.replication.AckStateMachine.SubscriptionView v = replicas.ackState().view(name);
+            if (v == null) continue;
+            w.beginObject().name("subscription").value(name).name("topic").value(v.topic()).name("leaseMs").value(v.leaseMs()).name("partitions").beginArray();
+            for (com.ember.replication.AckStateMachine.PartitionView p : v.partitions()) {
+                long logEnd = replicas.topic(v.topic()) == null ? 0 : replicas.topic(v.topic()).replicas().get(p.partition()).dataLog().nextOffset();
+                w.beginObject().name("partition").value(p.partition()).name("floor").value(p.floor()).name("next").value(p.next()).name("logEnd").value(logEnd)
+                        .name("inFlight").value(p.inFlight()).name("redeliver").value(p.redeliver()).name("doneAbove").value(p.doneAbove()).endObject();
+            }
+            w.endArray().endObject();
         }
         w.endArray();
 

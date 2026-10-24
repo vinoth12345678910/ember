@@ -37,6 +37,9 @@ public final class EmberCli {
               group watch --group=g [--interval-ms=50] [--for-ms=60000]   (timestamped changes of generation/members/owned/committed)
               group commit-probe --group=g --topic=t [--for-ms=20000]   (commit every 20 ms, print each outcome)
               consume-bench --topic=t --expect=N --mode=manual|group [--auto-commit=true|false]   (steady-state read throughput)
+              queue-create   --subscription=s --topic=t [--from-start=true|false] [--lease-ms=30000]   (ack queue: per-message acknowledgement)
+              queue-describe --subscription=s
+              queue-bench    --subscription=s [--workers=4] [--claim=100] [--records=N (stop after N acked)] [--hold-ms=0 (simulated work per message batch)]
               metadata     [--topic=t]
               bench        [--topic=t] [--partitions=3] [--producers=1] [--records=200000] [--value-bytes=100] [--batch=500]
                            [--warmup-records=0] [--rate=N records/s total (fixed-rate mode; default closed loop)] [--csv=FILE] [--acks-timeout=MS]
@@ -103,6 +106,7 @@ public final class EmberCli {
                     GroupCli.run(args[1], cfg, flags, out);
                 }
                 case "consume-bench" -> GroupCli.consumeBench(cfg, flags, out);
+                case "queue-create", "queue-describe", "queue-bench" -> QueueCli.run(args[0], cfg, flags, out);
                 case "cluster" -> ClusterCli.run(args[1], flags, out);
                 case "healthcheck" -> {
                     int code = ClusterCli.healthcheck(flags, out, err);

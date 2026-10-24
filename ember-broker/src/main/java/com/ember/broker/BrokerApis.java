@@ -267,6 +267,55 @@ public class BrokerApis {
         return result.error() == ErrorCode.NONE ? Outcome.ok(result.body()) : Outcome.error(result.error());
     }
 
+    // ------------------------------------------------------------------ ack queues
+
+    private void waitForAckLeaderIfAlone() {
+        if (replicas.isSingleBroker()) {
+            long deadline = System.nanoTime() + config.produceTimeoutMs() * 1_000_000L;
+            while (!replicas.acksGroup().isLeaderReady() && System.nanoTime() < deadline) {
+                java.util.concurrent.locks.LockSupport.parkNanos(1_000_000);
+            }
+        }
+    }
+
+    /** Any broker can answer: it only reads its own view of the "__acks" Raft group. */
+    public Outcome<FindCoordinatorResponse> handleQueueFind(QueueFindRequest request) {
+        waitForAckLeaderIfAlone();
+        int leader = replicas.ackLeaderId();
+        java.net.InetSocketAddress address = leader < 0 ? null : replicas.advertisedAddresses().get(leader);
+        if (address == null) {
+            return Outcome.error(ErrorCode.QUEUE_LEADER_NOT_AVAILABLE);
+        }
+        return Outcome.ok(new FindCoordinatorResponse(leader, address.getHostString(), address.getPort()));
+    }
+
+    public Outcome<QueueCreateResponse> handleQueueCreate(QueueCreateRequest r) {
+        waitForAckLeaderIfAlone();
+        var result = replicas.ackCoordinator().create(r.subscription(), r.topic(), r.fromStart(), r.leaseMs());
+        return result.error() == ErrorCode.NONE ? Outcome.ok(new QueueCreateResponse(result.partitions())) : Outcome.error(result.error());
+    }
+
+    public Outcome<QueueClaimResponse> handleQueueClaim(QueueClaimRequest r) {
+        waitForAckLeaderIfAlone();
+        var result = replicas.ackCoordinator().claim(r.subscription(), r.worker(), r.maxMessages(), r.leaseMs(), r.maxBytes());
+        return result.error() == ErrorCode.NONE ? Outcome.ok(new QueueClaimResponse(result.messages())) : Outcome.error(result.error());
+    }
+
+    public Outcome<QueueSettleResponse> handleQueueSettle(QueueSettleRequest r) {
+        byte type = switch (r.apiKey()) {
+            case QUEUE_ACK -> com.ember.replication.AckCommands.ACK;
+            case QUEUE_RELEASE -> com.ember.replication.AckCommands.RELEASE;
+            default -> com.ember.replication.AckCommands.EXTEND;
+        };
+        var result = replicas.ackCoordinator().settle(type, r.subscription(), r.worker(), r.leaseMs(), r.handles());
+        return result.error() == ErrorCode.NONE ? Outcome.ok(new QueueSettleResponse(result.settled(), result.rejected())) : Outcome.error(result.error());
+    }
+
+    public Outcome<QueueDescribeResponse> handleQueueDescribe(QueueDescribeRequest r) {
+        var result = replicas.ackCoordinator().describe(r.subscription());
+        return result.error() == ErrorCode.NONE ? Outcome.ok(result.body()) : Outcome.error(result.error());
+    }
+
     // ------------------------------------------------------------------ METADATA
 
     /** Versions 0 and 1: about THIS broker. v1 reports the real Raft leader of each partition (or -1). */

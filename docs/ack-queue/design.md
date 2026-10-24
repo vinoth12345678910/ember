@@ -1,6 +1,6 @@
 # Ack queues: per-message acknowledgement on Ember (design, branch `ack-queue-core`)
 
-Status: **proposal, no code yet.** Decisions marked **[D1]..[D5]** need a yes/no before implementation.
+Status: **implemented in branch `ack-queue-core`** with the recommended choices for D1-D5 (the user approved them). Section 11 records what was built and measured. Backoff, max attempts and the dead-letter queue, per-key ordering and the HTTP/SDK layer are later branches.
 
 ## 1. The problem
 
@@ -89,3 +89,17 @@ Wire: new API keys `QUEUE_CLAIM`, `QUEUE_ACK`, `QUEUE_RELEASE`, `QUEUE_EXTEND`, 
 - **[D3]** accept unbounded `__acks` log for now, snapshots later (recommended).
 - **[D4]** default lease 30 s, extendable, per-subscription override. OK?
 - **[D5]** subscription is created implicitly on first claim (recommended, like auto-created topics off by default here so: *explicit create by an admin or a registered app with consume permission*). Which one?
+
+## 11. What was built and measured
+
+- **D1** one `__acks` Raft group (`AckStateMachine`, `AckCommands`), **D2** claim returns the records inline (read from the leader's local copy of the partition), **D3** no snapshots yet, **D4** default lease 30 s (per-subscription `--lease-ms`, per-claim override), **D5** subscriptions are created explicitly (`queue-create`).
+- Wire: API keys 20-26 (`QUEUE_FIND`, `QUEUE_CREATE`, `QUEUE_CLAIM`, `QUEUE_ACK`, `QUEUE_RELEASE`, `QUEUE_EXTEND`, `QUEUE_DESCRIBE`), error codes 21-24. Client: `QueueConsumer`. CLI: `queue-create`, `queue-describe`, `queue-bench`. `/status` lists `__acks-0` and every subscription's per-partition progress.
+- Behaviour worth knowing:
+  * A claim serves only what the `__acks` leader has already applied from the partition, so right after a produce it may return fewer messages than exist. Callers poll.
+  * Leases use wall-clock milliseconds written into the commands. Expiry runs on the leader every 200 ms.
+  * A message that retention deleted before delivery is finished on the claimer's behalf instead of waiting for ever.
+  * Claims for one subscription are planned one at a time (serialised) on the leader; the command already carries a list of allotments, so coalescing several workers' claims into one Raft entry is a later optimisation that needs no protocol change.
+- Measured on a cloud VM, 3 brokers, fsync on, everything on one disk (one run each, treat as one setup):
+  * 8 workers, 6 partitions, claim up to 100, no simulated work: **12,371 messages/s** claimed and acked (60,000 messages, 0 redelivered, 0 rejected, claim p50 15 ms / p99 121 ms, ack p50 3 ms).
+  * 100 ms of simulated work per batch of 10, same 6 partitions: **529 messages/s with 6 workers** (the most a consumer group can use) versus **1,788 messages/s with 24 workers** (3.4x).
+- Tests: 13 state-machine, 9 coordinator (fake Raft log), 4 codec, and 3 real 3-broker integration tests (6 workers on 3 partitions get every message exactly once; a worker that never acks loses its messages and is fenced; killing the `__acks` leader loses no ack and brings no acked message back). Replaying a random 300-step command log on two replicas gives identical state.
