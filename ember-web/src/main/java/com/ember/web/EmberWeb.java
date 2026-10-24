@@ -60,8 +60,9 @@ public final class EmberWeb {
             System.out.println("created the first admin account: " + name + (generated ? " / " + password + "   (generated: note it now, it is not stored in clear)" : ""));
         }
 
+        AppStore apps = new AppStore(dataDir.resolve("apps.json"));
         BrokerGateway gateway = new BrokerGateway(bootstrap, admin);
-        WebServer server = new WebServer(host, port, users, new Tokens(key, 8L * 3600_000), gateway, java.time.Clock.systemUTC());
+        WebServer server = new WebServer(host, port, users, apps, new Tokens(key, 8L * 3600_000), gateway, java.time.Clock.systemUTC());
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             server.close();
             try {

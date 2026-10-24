@@ -25,8 +25,10 @@ final class WebServer implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(WebServer.class.getName());
     private static final int MAX_BODY = 1 << 20;
     private static final Pattern TOPIC = Pattern.compile("[a-zA-Z0-9._-]{1,128}");
+    private static final Pattern APP_MESSAGES = Pattern.compile("/api/app/topics/([^/]+)/messages");
     private static final Pattern MESSAGES = Pattern.compile("/api/topics/([^/]+)/messages");
     private static final Pattern USER = Pattern.compile("/api/admin/users/([^/]+)");
+    private static final Pattern APP = Pattern.compile("/api/admin/apps/([^/]+)(/rotate-key)?");
 
     private static final Map<String, String> TYPES = Map.of(
             "html", "text/html; charset=utf-8", "css", "text/css; charset=utf-8", "js", "text/javascript; charset=utf-8",
@@ -43,6 +45,7 @@ final class WebServer implements AutoCloseable {
     }
 
     private final UserStore users;
+    private final AppStore apps;
     private final Tokens tokens;
     private final BrokerGateway gateway;
     private final Clock clock;
@@ -50,8 +53,9 @@ final class WebServer implements AutoCloseable {
     private final ExecutorService pool = Executors.newFixedThreadPool(8);
     private final Map<String, ArrayDeque<Long>> failures = new HashMap<>();      // "ip|user" -> times of recent failed logins
 
-    WebServer(String host, int port, UserStore users, Tokens tokens, BrokerGateway gateway, Clock clock) throws IOException {
+    WebServer(String host, int port, UserStore users, AppStore apps, Tokens tokens, BrokerGateway gateway, Clock clock) throws IOException {
         this.users = users;
+        this.apps = apps;
         this.tokens = tokens;
         this.gateway = gateway;
         this.clock = clock;
@@ -124,6 +128,8 @@ final class WebServer implements AutoCloseable {
             send(ex, 200, "application/json; charset=utf-8", Json.write(result).getBytes(StandardCharsets.UTF_8));
         } catch (ApiException e) {
             send(ex, e.status, "application/json; charset=utf-8", Json.write(Json.obj("error", e.getMessage())).getBytes(StandardCharsets.UTF_8));
+        } catch (AppStore.AppException e) {
+            send(ex, e.status, "application/json; charset=utf-8", Json.write(Json.obj("error", e.getMessage())).getBytes(StandardCharsets.UTF_8));
         } catch (UserStore.UserException e) {
             send(ex, e.status, "application/json; charset=utf-8", Json.write(Json.obj("error", e.getMessage())).getBytes(StandardCharsets.UTF_8));
         } catch (IllegalArgumentException | ClassCastException | NullPointerException e) {
@@ -140,7 +146,7 @@ final class WebServer implements AutoCloseable {
         }
     }
 
-    private Object route(HttpExchange ex) throws IOException, UserStore.UserException {
+    private Object route(HttpExchange ex) throws IOException, UserStore.UserException, AppStore.AppException {
         String method = ex.getRequestMethod();
         String path = ex.getRequestURI().getPath();
         Map<String, String> query = query(ex.getRequestURI().getRawQuery());
@@ -150,6 +156,8 @@ final class WebServer implements AutoCloseable {
         if (path.equals("/api/auth/login") && method.equals("POST")) return login(ex, body(ex), now);
         if (path.equals("/api/auth/register") && method.equals("POST")) return register(ex, body(ex), now);
         if (path.equals("/api/health") && method.equals("GET")) return Json.obj("ok", true);
+
+        if (path.startsWith("/api/app/")) return appRoute(ex, method, path, query, now);
 
         UserStore.User me = authenticated(ex, now);
 
@@ -171,6 +179,18 @@ final class WebServer implements AutoCloseable {
             if (path.equals("/api/admin/cluster") && method.equals("GET")) return Json.obj("nodes", gateway.nodes());
             if (path.equals("/api/admin/topics") && method.equals("POST")) return createTopic(body(ex));
             if (path.equals("/api/admin/users") && method.equals("GET")) return Json.obj("users", users.list().stream().map(UserStore.User::view).toList());
+            if (path.equals("/api/admin/apps") && method.equals("GET")) return Json.obj("apps", apps.list());
+            if (path.equals("/api/admin/apps") && method.equals("POST")) return registerApp(body(ex), now);
+            Matcher ap = APP.matcher(path);
+            if (ap.matches()) {
+                String id = ap.group(1);
+                if (ap.group(2) != null && method.equals("POST")) return created(apps.rotateKey(id));
+                if (ap.group(2) == null && method.equals("PATCH")) return updateApp(id, body(ex));
+                if (ap.group(2) == null && method.equals("DELETE")) {
+                    apps.delete(id);
+                    return Json.obj("ok", true);
+                }
+            }
             Matcher u = USER.matcher(path);
             if (u.matches()) {
                 String name = URLDecoder.decode(u.group(1), StandardCharsets.UTF_8);
@@ -183,6 +203,52 @@ final class WebServer implements AutoCloseable {
             }
         }
         throw new ApiException(404, "no such endpoint");
+    }
+
+    /** Endpoints for registered apps, authenticated by API key (Authorization: Bearer emb_... or X-Ember-Key). */
+    private Object appRoute(HttpExchange ex, String method, String path, Map<String, String> query, long now) throws IOException, AppStore.AppException {
+        String header = ex.getRequestHeaders().getFirst("Authorization");
+        String key = header != null && header.startsWith("Bearer ") ? header.substring(7).trim() : ex.getRequestHeaders().getFirst("X-Ember-Key");
+        AppStore.App app = apps.authenticate(key, now);
+        if (path.equals("/api/app/me") && method.equals("GET")) return Json.obj("app", apps.view(app));
+        Matcher m = APP_MESSAGES.matcher(path);
+        if (m.matches()) {
+            String topic = URLDecoder.decode(m.group(1), StandardCharsets.UTF_8);
+            checkTopic(topic);
+            if (method.equals("POST")) {
+                if (!app.canProduce(topic)) throw new ApiException(403, "this app may not produce to '" + topic + "'");
+                Object r = produce(topic, body(ex));
+                apps.stats(app.id()).produced.incrementAndGet();
+                return r;
+            }
+            if (method.equals("GET")) {
+                if (!app.canConsume(topic)) throw new ApiException(403, "this app may not consume from '" + topic + "'");
+                Object r = fetch(topic, query);
+                apps.stats(app.id()).fetched.addAndGet(((List<?>) ((Map<?, ?>) r).get("records")).size());
+                return r;
+            }
+        }
+        throw new ApiException(404, "no such endpoint");
+    }
+
+    private Object registerApp(Map<String, Object> b, long now) throws AppStore.AppException, IOException {
+        return created(apps.register(str(b, "name"), str(b, "description"), list(b, "produceTopics"), list(b, "consumeTopics"), now));
+    }
+
+    private Object updateApp(String id, Map<String, Object> b) throws AppStore.AppException, IOException {
+        return Json.obj("app", apps.view(apps.update(id, str(b, "description"), b.containsKey("produceTopics") ? list(b, "produceTopics") : null,
+                b.containsKey("consumeTopics") ? list(b, "consumeTopics") : null, (Boolean) b.get("disabled"))));
+    }
+
+    /** The key is returned here and nowhere else. */
+    private Object created(AppStore.Created c) {
+        return Json.obj("app", apps.view(c.app()), "apiKey", c.key());
+    }
+
+    private static List<String> list(Map<String, Object> m, String key) {
+        List<String> out = new java.util.ArrayList<>();
+        if (m.get(key) instanceof List<?> l) for (Object o : l) out.add((String) o);
+        return out;
     }
 
     private UserStore.User authenticated(HttpExchange ex, long now) {
@@ -239,9 +305,9 @@ final class WebServer implements AutoCloseable {
         if (partitions < 1 || partitions > 64) throw new ApiException(400, "partitions must be 1-64");
         try {
             return Json.obj("name", name, "partitions", gateway.createTopic(name, partitions));
-        } catch (IOException e) {
-            if (String.valueOf(e.getMessage()).toLowerCase().contains("exist")) throw new ApiException(409, "topic already exists");
-            throw e;
+        } catch (com.ember.client.EmberException e) {
+            if (e.errorCode() == com.ember.protocol.ErrorCode.TOPIC_ALREADY_EXISTS) throw new ApiException(409, "that topic already exists");
+            throw new ApiException(400, "the broker refused the topic: " + e.errorCode());
         }
     }
 

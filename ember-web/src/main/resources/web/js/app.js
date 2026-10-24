@@ -72,6 +72,7 @@ const routes = [
   [/^\/admin$/, shellPage('admin', 'overview', adminOverview, true)],
   [/^\/admin\/topics$/, shellPage('admin', 'admintopics', adminTopics, true)],
   [/^\/admin\/users$/, shellPage('admin', 'users', adminUsers, true)],
+  [/^\/admin\/apps$/, shellPage('admin', 'apps', adminApps, true)],
 ];
 
 async function navigate() {
@@ -118,6 +119,7 @@ function shellPage(area, key, render, adminOnly = false) {
         ${isAdmin() ? `<div class="group">Administration</div>
           ${nav('#/admin', 'overview', '♥', 'Cluster health')}
           ${nav('#/admin/topics', 'admintopics', '＋', 'Manage topics')}
+          ${nav('#/admin/apps', 'apps', '⬡', 'Apps')}
           ${nav('#/admin/users', 'users', '☺', 'Users')}` : ''}
         <div class="me">
           <div class="avatar">${esc(u.displayName[0].toUpperCase())}</div>
@@ -537,6 +539,85 @@ async function adminUsers(view, _a, _p, alive) {
         await api(url, { method: 'PATCH', body: { disabled: b.dataset.v === 'true' } });
       }
       toast('Updated ' + user);
+      await paint();
+    } catch (err) { toast(err.message, true); }
+  });
+}
+
+const splitList = s => s.split(/[\s,]+/).filter(Boolean);
+
+function showKey(app, key, title) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  const base = location.origin;
+  const sample = `curl -X POST ${base}/api/app/topics/TOPIC/messages \\\n  -H "Authorization: Bearer ${key}" \\\n  -d '{"key":"k1","value":"hello"}'`;
+  bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="width:min(560px,100%)"><h2>${esc(title)}</h2>
+    <p class="hint" style="margin:0 0 12px">Copy this key now. It is stored only as a hash, so it cannot be shown again. <b>${esc(app.name)}</b> uses it to sign in.</p>
+    <div class="field"><label>API key</label><div style="display:flex;gap:8px"><input class="input mono" id="k" readonly value="${esc(key)}"><button class="btn" id="cp">Copy</button></div></div>
+    <div class="field"><label>Try it</label><pre class="input mono" style="margin:0;overflow-x:auto;font-size:12px">${esc(sample)}</pre></div>
+    <div class="actions"><button class="btn primary" id="done">I have saved the key</button></div></div>`;
+  document.body.append(bg);
+  $('#k', bg).select();
+  $('#cp', bg).onclick = async () => { try { await navigator.clipboard.writeText(key); toast('Key copied'); } catch { $('#k', bg).select(); toast('Press Ctrl/Cmd+C to copy'); } };
+  $('#done', bg).onclick = () => bg.remove();
+}
+
+async function adminApps(view, _a, _p, alive) {
+  const paint = async () => {
+    const { apps } = await api('/admin/apps');
+    if (!alive()) return;
+    const pills = l => l.length ? l.map(t => `<span class="badge mono">${esc(t)}</span>`).join(' ') : '<span class="hint">none</span>';
+    view.innerHTML = head('Apps', 'Services that connect to Ember with an API key. Each one can only touch the topics you allow.', `<button class="btn primary" id="new">Register app</button>`) +
+      `<div class="panel">${apps.length ? `<div class="table-wrap"><table><thead><tr><th>App</th><th>Can produce to</th><th>Can consume from</th><th>Key</th><th>Activity</th><th></th></tr></thead><tbody>
+      ${apps.map(a => `<tr><td><b>${esc(a.name)}</b> ${a.disabled ? '<span class="badge bad">disabled</span>' : ''}<div class="hint">${esc(a.description)}</div><div class="hint mono">${esc(a.id)}</div></td>
+        <td>${pills(a.produceTopics)}</td><td>${pills(a.consumeTopics)}</td><td class="mono">${esc(a.keyPrefix)}…</td>
+        <td class="hint">${num(a.produced)} sent<br>${num(a.fetched)} read<br>${a.lastSeen ? 'seen ' + esc(new Date(a.lastSeen).toLocaleTimeString()) : 'never connected'}</td>
+        <td><div class="row-actions"><button class="btn sm" data-a="edit" data-i="${esc(a.id)}">Edit</button><button class="btn sm" data-a="rotate" data-i="${esc(a.id)}">New key</button>
+        <button class="btn sm" data-a="toggle" data-i="${esc(a.id)}" data-v="${!a.disabled}">${a.disabled ? 'Enable' : 'Disable'}</button><button class="btn sm danger" data-a="delete" data-i="${esc(a.id)}">Delete</button></div></td></tr>`).join('')}
+      </tbody></table></div>` : empty('No apps registered', 'Register your first service to get an API key.')}</div>`;
+    view._apps = apps;
+    $('#new', view).onclick = () => modal('Register app', `
+      <div class="field"><label for="an">Name</label><input class="input" id="an" required maxlength="48" placeholder="matcher"></div>
+      <div class="field"><label for="ad">Description <span class="hint">(optional)</span></label><input class="input" id="ad" maxlength="200" placeholder="Pairs riders with nearby drivers"></div>
+      <div class="field"><label for="ap">Can produce to</label><input class="input mono" id="ap" placeholder="ride-events, payments.*"><span class="hint">Topic names, a prefix like <code>orders.*</code>, or <code>*</code> for all. Separate with commas.</span></div>
+      <div class="field"><label for="ac">Can consume from</label><input class="input mono" id="ac" placeholder="ride-requests"></div>`,
+      async bg => {
+        const r = await api('/admin/apps', { method: 'POST', body: { name: $('#an', bg).value, description: $('#ad', bg).value,
+          produceTopics: splitList($('#ap', bg).value), consumeTopics: splitList($('#ac', bg).value) } });
+        await paint();
+        showKey(r.app, r.apiKey, 'App registered');
+      }, 'Register');
+  };
+  await paint();
+  view.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-a]');
+    if (!b) return;
+    const app = (view._apps || []).find(x => x.id === b.dataset.i);
+    if (!app) return;
+    const url = '/admin/apps/' + encodeURIComponent(app.id);
+    try {
+      if (b.dataset.a === 'delete') {
+        if (!confirm(`Delete ${app.name}? Its key stops working immediately.`)) return;
+        await api(url, { method: 'DELETE' });
+      } else if (b.dataset.a === 'toggle') {
+        await api(url, { method: 'PATCH', body: { disabled: b.dataset.v === 'true' } });
+      } else if (b.dataset.a === 'rotate') {
+        if (!confirm(`Issue a new key for ${app.name}? The old key stops working immediately.`)) return;
+        const r = await api(url + '/rotate-key', { method: 'POST' });
+        await paint();
+        return showKey(r.app, r.apiKey, 'New key issued');
+      } else {
+        return modal('Edit ' + app.name, `
+          <div class="field"><label for="ad">Description</label><input class="input" id="ad" maxlength="200" value="${esc(app.description)}"></div>
+          <div class="field"><label for="ap">Can produce to</label><input class="input mono" id="ap" value="${esc(app.produceTopics.join(', '))}"></div>
+          <div class="field"><label for="ac">Can consume from</label><input class="input mono" id="ac" value="${esc(app.consumeTopics.join(', '))}"></div>`,
+          async bg => {
+            await api(url, { method: 'PATCH', body: { description: $('#ad', bg).value, produceTopics: splitList($('#ap', bg).value), consumeTopics: splitList($('#ac', bg).value) } });
+            toast('Saved ' + app.name);
+            await paint();
+          });
+      }
+      toast('Updated ' + app.name);
       await paint();
     } catch (err) { toast(err.message, true); }
   });
