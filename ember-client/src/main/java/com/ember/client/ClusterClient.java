@@ -370,6 +370,98 @@ public final class ClusterClient implements Router {
         return coordinatorRoute(groupId, c -> c.describeGroup(groupId));
     }
 
+    // ------------------------------------------------------------------ ack queues: the leader of "__acks"
+
+    private String queueAddress;                       // "host:port" of the "__acks" leader; null = unknown, ask again
+
+    private static boolean queueRetriable(ErrorCode code) {
+        return switch (code) {
+            case NOT_QUEUE_LEADER, QUEUE_LEADER_NOT_AVAILABLE, REQUEST_TIMED_OUT, BROKER_OVERLOADED -> true;
+            default -> false;                          // UNKNOWN_SUBSCRIPTION, SUBSCRIPTION_ALREADY_EXISTS, ...: the caller reacts
+        };
+    }
+
+    private void locateQueueLeader() throws IOException {
+        List<String> candidates = new ArrayList<>();
+        for (String[] b : brokers.values()) candidates.add(b[0] + ":" + b[1]);
+        for (String b : bootstrap) if (!candidates.contains(b)) candidates.add(b);
+        IOException lastIo = null;
+        EmberException lastBroker = null;
+        for (String address : candidates) {
+            try {
+                FindCoordinatorResponse r = connectionTo(address).queueFind();
+                queueAddress = r.host() + ":" + r.port();
+                return;
+            } catch (EmberException e) {
+                lastBroker = e;
+            } catch (IOException e) {
+                lastIo = e;
+                dropConnection(address);
+            }
+        }
+        queueAddress = null;
+        if (lastBroker != null) throw lastBroker;
+        throw lastIo != null ? lastIo : new IOException("no broker to ask");
+    }
+
+    private <T> T queueRoute(Call<T> call) throws IOException {
+        if (closed) throw new IOException("client is closed");
+        long backoff = config.retryBackoffMs();
+        Exception last = null;
+        for (int attempt = 0; attempt <= config.retries(); attempt++) {
+            if (attempt > 0) {
+                retried.incrementAndGet();
+                pause(backoff);
+                backoff = Math.min(backoff * 2, config.maxRetryBackoffMs());
+            }
+            String address = queueAddress;
+            try {
+                if (address == null) {
+                    locateQueueLeader();
+                    address = queueAddress;
+                }
+                return call.run(connectionTo(address));
+            } catch (EmberException e) {
+                if (!queueRetriable(e.errorCode())) throw e;
+                last = e;
+                if (e.errorCode() == ErrorCode.NOT_QUEUE_LEADER || e.errorCode() == ErrorCode.QUEUE_LEADER_NOT_AVAILABLE) {
+                    queueAddress = null;
+                }
+            } catch (IOException e) {
+                last = e;
+                if (address != null) dropConnection(address);
+                queueAddress = null;
+            }
+        }
+        if (last instanceof EmberException e) throw e;
+        throw new IOException("ack queue leader unreachable after " + config.retries() + " retries: " + last, last);
+    }
+
+    public synchronized int queueCreate(String subscription, String topic, boolean fromStart, int leaseMs, int maxAttempts, int backoffBaseMs,
+                                        int backoffMaxMs) throws IOException {
+        return queueRoute(c -> c.queueCreate(subscription, topic, fromStart, leaseMs, maxAttempts, backoffBaseMs, backoffMaxMs));
+    }
+
+    public synchronized QueueSettleResponse queueNack(String subscription, String worker, List<QueueHandle> handles, String reason) throws IOException {
+        return queueRoute(c -> c.queueNack(subscription, worker, handles, reason));
+    }
+
+    public synchronized QueueDeadListResponse queueDeadList(String subscription, int maxItems) throws IOException {
+        return queueRoute(c -> c.queueDeadList(subscription, maxItems));
+    }
+
+    public synchronized List<QueueMessage> queueClaim(String subscription, String worker, int maxMessages, int leaseMs, int maxBytes) throws IOException {
+        return queueRoute(c -> c.queueClaim(subscription, worker, maxMessages, leaseMs, maxBytes));
+    }
+
+    public synchronized QueueSettleResponse queueSettle(ApiKey api, String subscription, String worker, List<QueueHandle> handles, int leaseMs) throws IOException {
+        return queueRoute(c -> c.queueSettle(api, subscription, worker, handles, leaseMs));
+    }
+
+    public synchronized QueueDescribeResponse queueDescribe(String subscription) throws IOException {
+        return queueRoute(c -> c.queueDescribe(subscription));
+    }
+
     // ------------------------------------------------------------------ Router
 
     @Override

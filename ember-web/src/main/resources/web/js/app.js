@@ -73,6 +73,8 @@ const routes = [
   [/^\/admin\/topics$/, shellPage('admin', 'admintopics', adminTopics, true)],
   [/^\/admin\/users$/, shellPage('admin', 'users', adminUsers, true)],
   [/^\/admin\/apps$/, shellPage('admin', 'apps', adminApps, true)],
+  [/^\/admin\/queues$/, shellPage('admin', 'queues', adminQueues, true)],
+  [/^\/admin\/queues\/(.+)$/, shellPage('admin', 'queues', adminDead, true)],
 ];
 
 async function navigate() {
@@ -119,6 +121,7 @@ function shellPage(area, key, render, adminOnly = false) {
         ${isAdmin() ? `<div class="group">Administration</div>
           ${nav('#/admin', 'overview', '♥', 'Cluster health')}
           ${nav('#/admin/topics', 'admintopics', '＋', 'Manage topics')}
+          ${nav('#/admin/queues', 'queues', '⇄', 'Queues')}
           ${nav('#/admin/apps', 'apps', '⬡', 'Apps')}
           ${nav('#/admin/users', 'users', '☺', 'Users')}` : ''}
         <div class="me">
@@ -618,6 +621,88 @@ async function adminApps(view, _a, _p, alive) {
           });
       }
       toast('Updated ' + app.name);
+      await paint();
+    } catch (err) { toast(err.message, true); }
+  });
+}
+
+function queueTotals(q) {
+  const t = { inFlight: 0, redeliver: 0, dead: 0, waiting: 0, finished: 0 };
+  q.partitions.forEach(p => { t.inFlight += p.inFlight; t.redeliver += p.redeliver; t.dead += p.dead; t.waiting += Math.max(0, p.logEnd - p.next); t.finished += p.floor + p.doneAbove; });
+  return t;
+}
+
+async function adminQueues(view, _a, _p, alive) {
+  const paint = async () => {
+    const { queues } = await api('/admin/queues');
+    if (!alive()) return;
+    view.innerHTML = head('Queues', 'Per-message acknowledgement. A failing message is retried with a growing delay, then set aside as a dead letter so it never blocks the others.',
+      `<button class="btn primary" id="new">New queue</button>`) +
+      `<div class="panel">${queues.length ? `<div class="table-wrap"><table><thead><tr><th>Queue</th><th>Topic</th><th class="num">Waiting</th><th class="num">In flight</th><th class="num">Retrying</th><th class="num">Dead</th><th>Policy</th><th></th></tr></thead><tbody>
+      ${queues.map(q => { const t = queueTotals(q); return `<tr><td><b class="mono">${esc(q.subscription)}</b></td><td class="mono">${esc(q.topic)}</td>
+        <td class="num">${num(t.waiting)}</td><td class="num">${num(t.inFlight)}</td><td class="num">${num(t.redeliver)}</td>
+        <td class="num">${t.dead ? `<span class="badge bad">${num(t.dead)}</span>` : '<span class="hint">0</span>'}</td>
+        <td class="hint">${q.maxAttempts} attempts · wait ${esc(secs(q.backoffBaseMs))}–${esc(secs(q.backoffMaxMs))} · lease ${esc(secs(q.leaseMs))}</td>
+        <td><div class="row-actions"><a class="btn sm" href="#/admin/queues/${encodeURIComponent(q.subscription)}">Dead letters</a></div></td></tr>`; }).join('')}
+      </tbody></table></div>` : empty('No queues yet', 'Create one on a topic to start tracking each message separately.')}</div>`;
+    $('#new', view).onclick = async () => {
+      const { topics } = await api('/topics');
+      if (!topics.length) return toast('Create a topic first.', true);
+      modal('New queue', `
+        <div class="field"><label for="qn">Name</label><input class="input" id="qn" required maxlength="128" placeholder="matcher" pattern="[a-zA-Z0-9._\\-]+"></div>
+        <div class="field"><label for="qt">Topic</label><select class="input" id="qt">${topics.map(t => `<option>${esc(t.name)}</option>`).join('')}</select></div>
+        <div class="field"><label for="qs">Start from</label><select class="input" id="qs"><option value="1">The beginning of the topic</option><option value="0">Only new messages</option></select></div>
+        <div class="toolbar"><div class="field"><label for="qa">Attempts before dead</label><input class="input" id="qa" type="number" min="1" max="100" value="5"></div>
+        <div class="field"><label for="qb">First retry wait (s)</label><input class="input" id="qb" type="number" min="0" step="0.1" value="1"></div>
+        <div class="field"><label for="qm">Longest wait (s)</label><input class="input" id="qm" type="number" min="0" step="1" value="60"></div></div>
+        <div class="field"><label for="ql">Lease (s)</label><input class="input" id="ql" type="number" min="1" value="30"><span class="hint">How long a worker may hold a message before it is given to someone else.</span></div>`,
+        async bg => {
+          const name = $('#qn', bg).value.trim();
+          await api('/admin/queues', { method: 'POST', body: { name, topic: $('#qt', bg).value, fromStart: $('#qs', bg).value === '1',
+            maxAttempts: Number($('#qa', bg).value), backoffMs: Math.round(Number($('#qb', bg).value) * 1000), backoffMaxMs: Math.round(Number($('#qm', bg).value) * 1000),
+            leaseMs: Math.round(Number($('#ql', bg).value) * 1000) } });
+          toast(`Queue “${name}” created`);
+          await paint();
+        }, 'Create queue');
+    };
+  };
+  await paint();
+  refreshEvery(5000, alive, paint);
+}
+const secs = ms => ms >= 1000 ? (ms / 1000).toFixed(ms % 1000 ? 1 : 0) + ' s' : ms + ' ms';
+
+async function adminDead(view, [queue], _p, alive) {
+  const paint = async () => {
+    const [{ total, items }, { queues }] = await Promise.all([api('/admin/queues/' + encodeURIComponent(queue) + '/dead?max=200'), api('/admin/queues')]);
+    if (!alive()) return;
+    const q = queues.find(x => x.subscription === queue);
+    view.innerHTML = head(`Dead letters · <span class="mono">${esc(queue)}</span>`,
+      q ? `Messages from <b class="mono">${esc(q.topic)}</b> that failed ${q.maxAttempts} times. Fix the cause, then retry them; or discard what is not worth keeping.` : '',
+      `<a class="btn" href="#/admin/queues">All queues</a>`) +
+      `<div class="panel"><header><h2>${num(total)} dead message${total === 1 ? '' : 's'}${total > items.length ? ` (showing ${items.length})` : ''}</h2>
+      <div class="row-actions">${items.length ? `<button class="btn sm" data-a="retry-all">Retry all shown</button><button class="btn sm danger" data-a="discard-all">Discard all shown</button>` : ''}</div></header>
+      ${items.length ? `<div class="table-wrap"><table><thead><tr><th>Where</th><th>Why it failed</th><th class="num">Failures</th><th>When</th><th>Message</th><th></th></tr></thead><tbody>
+      ${items.map((m, i) => `<tr><td class="mono">p${m.partition} · #${num(m.offset)}</td><td>${esc(m.reason || '—')}</td><td class="num">${m.failures}</td><td class="hint">${esc(new Date(m.deadAt).toLocaleString())}</td>
+        <td>${m.key != null ? `<div class="hint mono">key ${esc(m.key)}</div>` : ''}<div class="val" title="Click to expand">${m.value ? esc(m.value) : '<span class="hint">content no longer in the log</span>'}</div></td>
+        <td><div class="row-actions"><button class="btn sm" data-a="retry" data-i="${i}">Retry</button><button class="btn sm danger" data-a="discard" data-i="${i}">Discard</button></div></td></tr>`).join('')}
+      </tbody></table></div>` : empty('Nothing here', 'No message has used up its attempts. 🎉')}</div>`;
+    view._items = items;
+  };
+  await paint();
+  refreshEvery(5000, alive, paint);
+  view.addEventListener('click', async e => {
+    const val = e.target.closest('.val');
+    if (val) return val.classList.toggle('open');
+    const b = e.target.closest('button[data-a]');
+    if (!b) return;
+    const all = view._items || [];
+    const chosen = b.dataset.a.endsWith('-all') ? all : [all[Number(b.dataset.i)]].filter(Boolean);
+    const action = b.dataset.a.startsWith('retry') ? 'retry' : 'discard';
+    if (!chosen.length) return;
+    if (action === 'discard' && !confirm(`Discard ${chosen.length} message${chosen.length > 1 ? 's' : ''} for good? They will never be delivered.`)) return;
+    try {
+      const r = await api('/admin/queues/' + encodeURIComponent(queue) + '/dead/' + action, { method: 'POST', body: { items: chosen.map(m => ({ partition: m.partition, offset: m.offset })) } });
+      toast(`${action === 'retry' ? 'Re-queued' : 'Discarded'} ${r.settled} message${r.settled === 1 ? '' : 's'}`);
       await paint();
     } catch (err) { toast(err.message, true); }
   });

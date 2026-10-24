@@ -127,6 +127,41 @@ final class RequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
                     metrics.request(ApiKey.DESCRIBE_GROUP, out.error());
                     writeOutcome(ctx, correlationId, out.error(), out.body());
                 }
+                case QueueFindRequest q -> {
+                    BrokerApis.Outcome<FindCoordinatorResponse> out = apis.handleQueueFind(q);
+                    metrics.request(ApiKey.QUEUE_FIND, out.error());
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case QueueCreateRequest q -> {
+                    BrokerApis.Outcome<QueueCreateResponse> out = apis.handleQueueCreate(q);
+                    metrics.request(ApiKey.QUEUE_CREATE, out.error());
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case QueueClaimRequest q -> {
+                    BrokerApis.Outcome<QueueClaimResponse> out = apis.handleQueueClaim(q);
+                    metrics.request(ApiKey.QUEUE_CLAIM, out.error());
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case QueueSettleRequest q -> {
+                    BrokerApis.Outcome<QueueSettleResponse> out = apis.handleQueueSettle(q);
+                    metrics.request(q.apiKey(), out.error());
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case QueueNackRequest q -> {
+                    BrokerApis.Outcome<QueueSettleResponse> out = apis.handleQueueNack(q);
+                    metrics.request(ApiKey.QUEUE_NACK, out.error());
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case QueueDeadListRequest q -> {
+                    BrokerApis.Outcome<QueueDeadListResponse> out = apis.handleQueueDeadList(q);
+                    metrics.request(ApiKey.QUEUE_DEAD_LIST, out.error());
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
+                case QueueDescribeRequest q -> {
+                    BrokerApis.Outcome<QueueDescribeResponse> out = apis.handleQueueDescribe(q);
+                    metrics.request(ApiKey.QUEUE_DESCRIBE, out.error());
+                    writeOutcome(ctx, correlationId, out.error(), out.body());
+                }
             }
         } catch (Throwable t) {
             LOG.log(System.Logger.Level.ERROR, "internal error handling " + decoded.header().apiKey(), t);

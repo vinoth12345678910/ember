@@ -1,6 +1,6 @@
 # Ack queues: per-message acknowledgement on Ember (design, branch `ack-queue-core`)
 
-Status: **proposal, no code yet.** Decisions marked **[D1]..[D5]** need a yes/no before implementation.
+Status: **implemented in branch `ack-queue-core`** with the recommended choices for D1-D5 (the user approved them). Section 11 records what was built and measured. Backoff, max attempts and the dead-letter queue, per-key ordering and the HTTP/SDK layer are later branches.
 
 ## 1. The problem
 
@@ -89,3 +89,35 @@ Wire: new API keys `QUEUE_CLAIM`, `QUEUE_ACK`, `QUEUE_RELEASE`, `QUEUE_EXTEND`, 
 - **[D3]** accept unbounded `__acks` log for now, snapshots later (recommended).
 - **[D4]** default lease 30 s, extendable, per-subscription override. OK?
 - **[D5]** subscription is created implicitly on first claim (recommended, like auto-created topics off by default here so: *explicit create by an admin or a registered app with consume permission*). Which one?
+
+## 11. What was built and measured
+
+- **D1** one `__acks` Raft group (`AckStateMachine`, `AckCommands`), **D2** claim returns the records inline (read from the leader's local copy of the partition), **D3** no snapshots yet, **D4** default lease 30 s (per-subscription `--lease-ms`, per-claim override), **D5** subscriptions are created explicitly (`queue-create`).
+- Wire: API keys 20-26 (`QUEUE_FIND`, `QUEUE_CREATE`, `QUEUE_CLAIM`, `QUEUE_ACK`, `QUEUE_RELEASE`, `QUEUE_EXTEND`, `QUEUE_DESCRIBE`), error codes 21-24. Client: `QueueConsumer`. CLI: `queue-create`, `queue-describe`, `queue-bench`. `/status` lists `__acks-0` and every subscription's per-partition progress.
+- Behaviour worth knowing:
+  * A claim serves only what the `__acks` leader has already applied from the partition, so right after a produce it may return fewer messages than exist. Callers poll.
+  * Leases use wall-clock milliseconds written into the commands. Expiry runs on the leader every 200 ms.
+  * A message that retention deleted before delivery is finished on the claimer's behalf instead of waiting for ever.
+  * Claims for one subscription are planned one at a time (serialised) on the leader; the command already carries a list of allotments, so coalescing several workers' claims into one Raft entry is a later optimisation that needs no protocol change.
+- Measured on a cloud VM, 3 brokers, fsync on, everything on one disk (one run each, treat as one setup):
+  * 8 workers, 6 partitions, claim up to 100, no simulated work: **12,371 messages/s** claimed and acked (60,000 messages, 0 redelivered, 0 rejected, claim p50 15 ms / p99 121 ms, ack p50 3 ms).
+  * 100 ms of simulated work per batch of 10, same 6 partitions: **529 messages/s with 6 workers** (the most a consumer group can use) versus **1,788 messages/s with 24 workers** (3.4x).
+- Tests: 13 state-machine, 9 coordinator (fake Raft log), 4 codec, and 3 real 3-broker integration tests (6 workers on 3 partitions get every message exactly once; a worker that never acks loses its messages and is fenced; killing the `__acks` leader loses no ack and brings no acked message back). Replaying a random 300-step command log on two replicas gives identical state.
+
+## 12. Retries, backoff and the dead-letter set (branch `retry-dead-letter`)
+
+**Two counters per message.** The *attempt* number identifies one delivery and only grows (it is what fences a stale ack). The *failure* count says how many deliveries failed. A **nack** and a **lease that ran out** are failures; a **release** is not (a worker shutting down must not burn a message's attempts).
+
+**Policy per subscription:** `maxAttempts` (default 5), `backoffBaseMs` (1 s), `backoffMaxMs` (60 s), chosen at `queue-create`. After a nack the message waits `base * 2^(failures-1)` capped at the maximum, plus up to 25% jitter. The jitter is derived from the offset, not from a random generator, so every replica computes the same value (the state machine stays a pure function; the time comes from the `now` the leader wrote into the NACK command). A lease that ran out is redelivered at once (it already waited a whole lease) but counts as a failure, so a message that crashes or hangs every worker is dead-lettered too, after `maxAttempts` leases.
+
+**Dead letters live in the same Raft state, not in a second topic.** When failures reach `maxAttempts` the message moves from the retry set to a per-partition `dead` map (attempt, failures, time, reason). No cross-group write, so there is no window where a message is both dead and still queued, or neither. The record content stays in the partition log; the dead-letter list reads it from there. Consequences, stated plainly:
+- a dead message is **not finished**: it holds the partition's `floor` (the "everything below is done" marker) until an admin retries or discards it; later messages keep flowing and are tracked above the floor;
+- if retention deletes the record before an admin looks, the entry stays but its content shows as gone (a copy into a separate dead-letter topic would avoid that, at the price of a non-atomic move; not done here).
+
+**Admin operations** (any broker can be asked; the `__acks` leader serves them): `QUEUE_DEAD_LIST`, `QUEUE_DEAD_RETRY` (back into the queue due at once, failure count reset, attempt numbers keep growing so old acks stay fenced) and `QUEUE_DEAD_DISCARD` (finished for good). The console has a Queues page with the policy, live counts and a dead-letter table with Retry / Discard (one or all shown).
+
+**Wire:** API keys 27-30 (`QUEUE_NACK`, `QUEUE_DEAD_LIST`, `QUEUE_DEAD_RETRY`, `QUEUE_DEAD_DISCARD`); `QUEUE_CREATE` carries the policy and `QUEUE_DESCRIBE` returns it plus a dead count per partition. A `CREATE` entry written by the previous version (no policy fields) is still read, with the defaults.
+
+**Measured** (cloud VM, 3 brokers, fsync on, 8 workers, claim 50, 12,000 messages on 6 partitions, every 100th message always nacked, policy 3 attempts / 200-1000 ms): all **11,878 healthy messages were acked (2,916 messages/s end to end, including the tail while the poison messages finished retrying)**, and **122 poison messages were dead-lettered after exactly 3 failed attempts each**. Nothing waited behind them: `doneAbove` shows the healthy ones finished on both sides of every poison offset.
+
+**Tests:** 8 new state-machine tests (backoff growth and cap, max attempts, release is not a failure, retry resets the budget, discard moves the floor, fencing, a random 400-step log replays identically on two replicas, old-format CREATE), 3 coordinator tests (backoff-aware claiming, dead list with content, retry/discard), codec tests, and 2 real 3-broker tests (poison messages retried 3 times then dead-lettered while 98 others finish, dead set survives killing the `__acks` leader, retry after "the fix" delivers them; discard moves the floor).

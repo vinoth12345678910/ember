@@ -42,6 +42,8 @@ public final class ReplicaManager implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(ReplicaManager.class.getName());
     public static final String META_TOPIC = "__meta";
     public static final String GROUPS_TOPIC = "__groups";
+    /** The Raft group that holds per-message acknowledgement state (ack queues). */
+    public static final String ACKS_TOPIC = "__acks";
 
     /** How a group sends a Raft message to a peer broker. Must never block. */
     public interface RaftSender {
@@ -106,6 +108,9 @@ public final class ReplicaManager implements AutoCloseable {
     private final GroupStateMachine groupState = new GroupStateMachine();
     private final GroupRuntime groupsGroup;
     private final GroupCoordinator coordinator;
+    private final AckStateMachine ackState = new AckStateMachine();
+    private final GroupRuntime acksGroup;
+    private final AckCoordinator ackCoordinator;
     private volatile boolean closed;
 
     public ReplicaManager(BrokerConfig config, Map<Integer, InetSocketAddress> addresses, RaftSender sender) throws IOException {
@@ -152,6 +157,50 @@ public final class ReplicaManager implements AutoCloseable {
                 GroupRuntime::monotonicMillis, () -> java.util.UUID.randomUUID().toString(),
                 new GroupCoordinator.Config(config.groupMinSessionMs(), config.groupMaxSessionMs(), config.produceTimeoutMs(), 5));
         groupsGroup.start();
+
+        // ack queues: one more Raft group; its leader serves claim/ack/release/extend for every subscription.
+        this.acksGroup = newGroup(ACKS_TOPIC, 0, ackState);
+        this.ackCoordinator = new AckCoordinator("broker " + selfId, GroupLog.of(acksGroup), ackState, new QueueDataView(),
+                System::currentTimeMillis, new AckCoordinator.Config(30_000, config.produceTimeoutMs(), 5, 1000));
+        acksGroup.start();
+    }
+
+    /** The topic data of THIS broker, as the ack coordinator needs it. */
+    private final class QueueDataView implements AckCoordinator.QueueData {
+        @Override
+        public int partitionCount(String topic) {
+            TopicState t = topics.get(topic);
+            return t == null ? -1 : t.partitionCount();
+        }
+
+        private PartitionReplica replica(String topic, int partition) {
+            return byKey.get(topic + "-" + partition);
+        }
+
+        @Override
+        public long logStart(String topic, int partition) {
+            PartitionReplica r = replica(topic, partition);
+            return r == null ? 0 : r.dataLog().startOffset();
+        }
+
+        @Override
+        public long logEnd(String topic, int partition) {
+            PartitionReplica r = replica(topic, partition);
+            return r == null ? 0 : r.dataLog().nextOffset();
+        }
+
+        @Override
+        public com.ember.storage.LogRecord read(String topic, int partition, long offset) throws IOException {
+            PartitionReplica r = replica(topic, partition);
+            if (r == null) {
+                return null;
+            }
+            try {
+                return r.dataLog().read(offset);
+            } catch (com.ember.storage.OffsetOutOfRangeException e) {
+                return null;                                    // removed by retention while we were looking
+            }
+        }
     }
 
     private static Thread daemon(Runnable r, String name) {
@@ -304,6 +353,24 @@ public final class ReplicaManager implements AutoCloseable {
         return coordinator;
     }
 
+    public GroupRuntime acksGroup() {
+        return acksGroup;
+    }
+
+    public AckCoordinator ackCoordinator() {
+        return ackCoordinator;
+    }
+
+    /** Test/admin hook: the replicated ack-queue state on THIS broker. */
+    public AckStateMachine ackState() {
+        return ackState;
+    }
+
+    /** The leader of "__acks" (this broker included) or -1. */
+    public int ackLeaderId() {
+        return acksGroup.isLeader() ? selfId : acksGroup.leaderId();
+    }
+
     /** Test hook: the replicated state of all consumer groups on THIS broker (compare snapshots across brokers). */
     public GroupStateMachine groupState() {
         return groupState;
@@ -355,6 +422,10 @@ public final class ReplicaManager implements AutoCloseable {
         }
         if (topic.equals(GROUPS_TOPIC) && partition == 0) {
             groupsGroup.deliver(fromNode, message);
+            return;
+        }
+        if (topic.equals(ACKS_TOPIC) && partition == 0) {
+            acksGroup.deliver(fromNode, message);
             return;
         }
         PartitionReplica r = byKey.get(topic + "-" + partition);
@@ -418,6 +489,22 @@ public final class ReplicaManager implements AutoCloseable {
         maintenance.scheduleWithFixedDelay(() -> runMaintenance(clock.millis()),
                 config.maintenanceIntervalMs(), config.maintenanceIntervalMs(), TimeUnit.MILLISECONDS);
         scheduleSessionExpiry();
+        scheduleLeaseExpiry();
+    }
+
+    /** Lease expiry (ack queues): the "__acks" leader hands overdue messages back every 200 ms. */
+    private void scheduleLeaseExpiry() {
+        try {
+            sessions.scheduleWithFixedDelay(() -> {
+                try {
+                    ackCoordinator.expireLeases();
+                } catch (RuntimeException e) {
+                    LOG.log(System.Logger.Level.ERROR, "lease expiry failed", e);
+                }
+            }, 200, 200, TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            // shutting down
+        }
     }
 
     /** Session expiry runs on its own cadence (a quarter of the shortest session in use), on its own thread. */
@@ -464,6 +551,7 @@ public final class ReplicaManager implements AutoCloseable {
                 if (graceful) r.group().close(); else r.group().abort();
             }
         }
+        if (graceful) acksGroup.close(); else acksGroup.abort();
         if (graceful) groupsGroup.close(); else groupsGroup.abort();
         if (graceful) metaGroup.close(); else metaGroup.abort();
         for (TopicState t : topics.values()) {

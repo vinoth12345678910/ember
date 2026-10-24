@@ -33,7 +33,14 @@ public enum ErrorCode {
     /** The session timeout is outside the range the broker allows: a caller bug. */
     INVALID_SESSION_TIMEOUT(19),
     /** OFFSET_COMMIT for a partition that is not assigned to this member: a caller bug. */
-    PARTITION_NOT_ASSIGNED(20);
+    PARTITION_NOT_ASSIGNED(20),
+    /** This broker does not lead the "__acks" Raft group: QUEUE_FIND again and retry. */
+    NOT_QUEUE_LEADER(21),
+    /** The "__acks" leader is unknown right now (an election is going on) or has not caught up yet: back off and retry. */
+    QUEUE_LEADER_NOT_AVAILABLE(22),
+    /** No subscription with that name. */
+    UNKNOWN_SUBSCRIPTION(23),
+    SUBSCRIPTION_ALREADY_EXISTS(24);
 
     private final short code;
 

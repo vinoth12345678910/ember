@@ -65,6 +65,38 @@ curl http://localhost:8088/api/app/me -H "Authorization: Bearer emb_..."
 
 The brokers themselves still have no authentication: the permission check lives in the console, so keep the broker ports private and let apps reach Ember only through it.
 
+## Ack queues (per-message acknowledgement)
+
+A consumer group tracks one position per partition, so one failing message blocks everything behind it and parallelism stops at the partition count. An **ack queue** tracks each message: a worker *claims* messages, *acks* the ones it finished, and anything not acked before its lease runs out goes to another worker. State lives in its own Raft group (`__acks`), so it survives the loss of a broker; the records stay in the partition logs. Many workers may share one partition. Delivery is at-least-once: a late ack from a worker that lost its lease is rejected.
+
+```bash
+java -jar ember-client-all.jar queue-create   --bootstrap=... --subscription=matcher --topic=ride-requests --lease-ms=30000
+java -jar ember-client-all.jar queue-bench    --bootstrap=... --subscription=matcher --workers=8 --claim=100
+java -jar ember-client-all.jar queue-describe --bootstrap=... --subscription=matcher
+```
+
+```java
+QueueConsumer.createSubscription(config, "matcher", "ride-requests", true, 30_000);
+try (QueueConsumer q = new QueueConsumer(config, "matcher", "worker-1")) {
+    List<QueueMessage> batch = q.claim(100);     // may be fewer than exist right after a produce: poll
+    // ... process each message idempotently ...
+    q.ack(batch);                                 // or q.release(batch) / q.extend(batch, 60_000)
+}
+```
+
+**Retries and dead letters.** `q.nack(batch, "reason")` says the messages could not be processed. They are retried after a growing delay (default 1 s doubling to 60 s) and, after `--max-attempts` failures (default 5), set aside as **dead letters** so they never block the rest. A lease that runs out counts as a failure; `release` does not. An admin retries or discards dead letters from the console (Queues page) or the CLI:
+
+```bash
+java -jar ember-client-all.jar queue-create  --bootstrap=... --subscription=payments --topic=orders --max-attempts=3 --backoff-ms=200 --backoff-max-ms=1000
+java -jar ember-client-all.jar queue-dead    --bootstrap=... --subscription=payments
+java -jar ember-client-all.jar queue-dead-retry   --bootstrap=... --subscription=payments --all      # or --partition=0 --offset=100
+java -jar ember-client-all.jar queue-dead-discard --bootstrap=... --subscription=payments --all
+```
+
+With 12,000 messages where every 100th always fails, 8 workers finished all 11,878 healthy ones (2,916 messages/s end to end) and dead-lettered the 122 poison messages after exactly 3 attempts each. A dead letter keeps holding the partition's progress marker (`floor`) until it is retried or discarded; the record itself stays in the partition log (and is lost to the dead-letter view if retention removes it first).
+
+Measured on one cloud VM (3 brokers, fsync on): 12,371 messages/s claim+ack with 8 workers; with 100 ms of work per batch on 6 partitions, 6 workers (the consumer-group limit) did 529 messages/s and 24 workers did 1,788 (3.4x). Design, failure behaviour and limits (no Raft snapshots yet, one `__acks` leader), including section 12 on retries and dead letters: [`docs/ack-queue/design.md`](docs/ack-queue/design.md).
+
 ## Contents
 [Architecture](#architecture) · [Design concepts](#design-concepts) · [Features](#features) · [Quickstart](#quickstart-docker) · [Guarantees](#guarantees-and-non-guarantees) · [Performance](#measured-performance) · [Testing](#how-i-tested-it) · [Failure matrix](#failure-matrix-summary) · [Structure](#project-structure) · [Build and run](#build-and-run) · [Limitations](#known-limitations)
 
@@ -383,7 +415,7 @@ try (EmberGroupConsumer consumer = new EmberGroupConsumer(config)) {
 
 ## Known limitations
 
-Replication factor = cluster size, with no adding or removing brokers; no Raft snapshots (the Raft log never shrinks and restart replays it); every record is written twice (Raft log + data log); one coordinator for all consumer groups and no compaction of the `__groups` log; eager rebalancing with a non-sticky range assignor; the default producer sends one request per partition in sequence (more partitions can mean *lower* single-producer throughput; `EmberProducer.pipelined` sends them in parallel); one advertised address per broker (no multiple listeners); no TLS or authentication; no exactly-once or idempotent producer; no long-poll fetch; the partition count of a topic is fixed and topics cannot be deleted.
+Replication factor = cluster size, with no adding or removing brokers; no Raft snapshots (the Raft log never shrinks and restart replays it); every record is written twice (Raft log + data log); one coordinator for all consumer groups and no compaction of the `__groups` or `__acks` logs; eager rebalancing with a non-sticky range assignor; the default producer sends one request per partition in sequence (more partitions can mean *lower* single-producer throughput; `EmberProducer.pipelined` sends them in parallel); one advertised address per broker (no multiple listeners); no TLS or authentication; no exactly-once or idempotent producer; no long-poll fetch; the partition count of a topic is fixed and topics cannot be deleted.
 
 ## What I would build next
 

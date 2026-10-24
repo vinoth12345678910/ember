@@ -35,7 +35,7 @@ public final class RequestCodec {
             case MetadataRequest m -> metadataSize(m);
             case CreateTopicRequest c -> stringSize(c.topic()) + 4;
             case RaftMessageRequest r -> stringSize(r.groupTopic()) + 4 + 4 + RaftMessageCodec.size(r.message());
-            default -> GroupCodec.requestSize(request);
+            default -> QueueCodec.handles(request) ? QueueCodec.requestSize(request) : GroupCodec.requestSize(request);
         };
         ByteBuffer buf = ByteBuffer.allocate(size);
         buf.putShort(header.apiKey().code());
@@ -79,7 +79,10 @@ public final class RequestCodec {
                     putString(buf, t);
                 }
             }
-            default -> GroupCodec.encodeRequest(buf, request);
+            default -> {
+                if (QueueCodec.handles(request)) QueueCodec.encodeRequest(buf, request);
+                else GroupCodec.encodeRequest(buf, request);
+            }
         }
         buf.flip();
         return buf;
@@ -129,6 +132,9 @@ public final class RequestCodec {
                 case RAFT_MESSAGE -> decodeRaftMessage(buf);
                 case FIND_COORDINATOR, JOIN_GROUP, HEARTBEAT, LEAVE_GROUP, OFFSET_COMMIT, OFFSET_FETCH, DESCRIBE_GROUP ->
                         GroupCodec.decodeRequest(apiKey, buf);
+                case QUEUE_FIND, QUEUE_CREATE, QUEUE_CLAIM, QUEUE_ACK, QUEUE_RELEASE, QUEUE_EXTEND, QUEUE_DESCRIBE, QUEUE_NACK, QUEUE_DEAD_LIST,
+                     QUEUE_DEAD_RETRY, QUEUE_DEAD_DISCARD ->
+                        QueueCodec.decodeRequest(apiKey, buf);
             };
             requireNoTrailingBytes(buf);
             return new Decoded(new RequestHeader(apiKey, version, correlationId), request);

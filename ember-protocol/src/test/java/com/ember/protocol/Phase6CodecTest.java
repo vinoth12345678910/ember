@@ -105,7 +105,7 @@ class Phase6CodecTest {
         }
         assertEquals(14, ErrorCode.NOT_COORDINATOR.code());
         assertEquals(20, ErrorCode.PARTITION_NOT_ASSIGNED.code());
-        assertThrows(ProtocolException.class, () -> ErrorCode.fromCode((short) 21));
+        assertThrows(ProtocolException.class, () -> ErrorCode.fromCode((short) 25));      // 21..24 are the ack-queue errors
     }
 
     @Test
