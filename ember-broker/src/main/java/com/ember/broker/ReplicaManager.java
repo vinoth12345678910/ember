@@ -155,7 +155,7 @@ public final class ReplicaManager implements AutoCloseable {
                     return t == null ? -1 : t.partitionCount();
                 },
                 GroupRuntime::monotonicMillis, () -> java.util.UUID.randomUUID().toString(),
-                new GroupCoordinator.Config(config.groupMinSessionMs(), config.groupMaxSessionMs(), config.produceTimeoutMs(), 5));
+                new GroupCoordinator.Config(config.groupMinSessionMs(), config.groupMaxSessionMs(), config.produceTimeoutMs(), 5, config.groupCooperative()));
         groupsGroup.start();
 
         // ack queues: one more Raft group; its leader serves claim/ack/release/extend for every subscription.

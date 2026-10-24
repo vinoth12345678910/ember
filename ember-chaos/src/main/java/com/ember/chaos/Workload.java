@@ -43,13 +43,18 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
 
     /** ratePerSecond: total produce rate of all producers (0 = as fast as they can go). */
     public record Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group, double ratePerSecond,
-                         int queueWorkers, String queue) {
+                         int queueWorkers, String queue, boolean cooperative) {
+        public Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group, double ratePerSecond,
+                      int queueWorkers, String queue) {
+            this(topic, partitions, producers, readers, consumers, bootstrap, group, ratePerSecond, queueWorkers, queue, false);
+        }
+
         public Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group, double ratePerSecond) {
-            this(topic, partitions, producers, readers, consumers, bootstrap, group, ratePerSecond, 0, null);
+            this(topic, partitions, producers, readers, consumers, bootstrap, group, ratePerSecond, 0, null, false);
         }
 
         public Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group) {
-            this(topic, partitions, producers, readers, consumers, bootstrap, group, 0, 0, null);
+            this(topic, partitions, producers, readers, consumers, bootstrap, group, 0, 0, null, false);
         }
     }
 
@@ -98,7 +103,17 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
             }
         }
         if (config.queueWorkers() > 0) {
-            QueueConsumer.createSubscription(clientConfig.withRetries(40, 100, 500), config.queue(), config.topic(), true, QUEUE_LEASE_MS, QUEUE_MAX_ATTEMPTS, 100, 300);
+            // The topic was just created on the metadata leader; the __acks leader may not have applied it yet (it hears about it with
+            // the next commit index), and then answers UNKNOWN_TOPIC_OR_PARTITION. That is a setup race, not a fault: wait briefly.
+            for (int attempt = 0; ; attempt++) {
+                try {
+                    QueueConsumer.createSubscription(clientConfig.withRetries(40, 100, 500), config.queue(), config.topic(), true, QUEUE_LEASE_MS, QUEUE_MAX_ATTEMPTS, 100, 300);
+                    break;
+                } catch (EmberException e) {
+                    if (e.errorCode() != ErrorCode.UNKNOWN_TOPIC_OR_PARTITION || attempt >= 50) throw e;
+                    java.util.concurrent.locks.LockSupport.parkNanos(100_000_000L);
+                }
+            }
         }
     }
 
@@ -251,7 +266,8 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
 
     private void consumeLoop(String process) {
         GroupConsumerConfig groupConfig = GroupConsumerConfig.of(config.bootstrap(), config.group()).withClient(clientConfig)
-                .withClientId(process).withSession(GROUP_SESSION_MS, GROUP_HEARTBEAT_MS).withAutoCommit(false, 5_000);
+                .withClientId(process).withSession(GROUP_SESSION_MS, GROUP_HEARTBEAT_MS).withAutoCommit(false, 5_000)
+                .withIncrementalRejoin(config.cooperative());
         EmberGroupConsumer consumer = new EmberGroupConsumer(groupConfig);
         consumers.add(consumer);
         consumer.subscribe(config.topic());

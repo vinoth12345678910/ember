@@ -27,6 +27,8 @@ public final class GroupCommands {
 
     public static final byte SET_MEMBERSHIP = 1;
     public static final byte OFFSET_COMMIT = 2;
+    /** Same payload as OFFSET_COMMIT, but it may also store partitions that are UNOWNED right now (a cooperative handoff's last words). */
+    public static final byte OFFSET_COMMIT_REVOKED = 3;
 
     private static final int MAX_LIST = 10_000;
 
@@ -147,9 +149,17 @@ public final class GroupCommands {
         return new SetMembership(group, base, next, members);
     }
 
+    /** The same bytes as encode(c) but marked as a last-words commit of revoked partitions. */
+    public static byte[] encodeRevoked(OffsetCommit c) {
+        byte[] bytes = encode(c);
+        bytes[0] = OFFSET_COMMIT_REVOKED;
+        return bytes;
+    }
+
     public static OffsetCommit decodeOffsetCommit(byte[] command) {
         ByteBuffer buf = ByteBuffer.wrap(command);
-        expectType(buf, OFFSET_COMMIT);
+        require(buf.hasRemaining() && (command[0] == OFFSET_COMMIT || command[0] == OFFSET_COMMIT_REVOKED), "wrong command type");
+        buf.get();
         String group = getString(buf);
         String member = getString(buf);
         int generation = getInt(buf);

@@ -197,7 +197,7 @@ final class AdminServer implements AutoCloseable {
         w.name("config").beginObject()
                 .name("raftElectionMinMs").value(config.raftElectionMinMs()).name("raftElectionMaxMs").value(config.raftElectionMaxMs())
                 .name("raftHeartbeatMs").value(config.raftHeartbeatMs()).name("produceTimeoutMs").value(config.produceTimeoutMs())
-                .name("unsafeNoRaftFsync").value(config.unsafeNoRaftFsync()).name("groupMinSessionMs").value(config.groupMinSessionMs())
+                .name("unsafeNoRaftFsync").value(config.unsafeNoRaftFsync()).name("groupRebalance").value(config.groupCooperative() ? "cooperative" : "eager").name("groupMinSessionMs").value(config.groupMinSessionMs())
                 .name("groupMaxSessionMs").value(config.groupMaxSessionMs()).name("defaultPartitions").value(config.defaultPartitions())
                 .endObject();
         reply(exchange, 200, "application/json", w.endObject().toString() + "\n");

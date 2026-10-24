@@ -33,11 +33,21 @@ public final class GroupCoordinator {
         int partitionCount(String topic);
     }
 
-    public record Config(int minSessionMs, int maxSessionMs, long proposeTimeoutMs, int maxCasAttempts) {
+    /**
+     * cooperative: partitions that stay with their owner are never interrupted by a rebalance. The assignment is sticky, and a
+     * partition that must change owner is first REVOKED (unowned for one generation) and given to its new owner only after the
+     * old owner has acknowledged by heartbeating the new generation. false = the eager behaviour: range assignment, everything
+     * changes in one generation.
+     */
+    public record Config(int minSessionMs, int maxSessionMs, long proposeTimeoutMs, int maxCasAttempts, boolean cooperative) {
         public Config {
             if (minSessionMs < 1 || maxSessionMs < minSessionMs || proposeTimeoutMs < 1 || maxCasAttempts < 1) {
                 throw new IllegalArgumentException("bad coordinator config");
             }
+        }
+
+        public Config(int minSessionMs, int maxSessionMs, long proposeTimeoutMs, int maxCasAttempts) {
+            this(minSessionMs, maxSessionMs, proposeTimeoutMs, maxCasAttempts, false);
         }
     }
 
@@ -66,6 +76,8 @@ public final class GroupCoordinator {
     // ---- soft state, guarded by "this"; never held while waiting for Raft
     private final Map<String, Long> lastHeartbeat = new HashMap<>();
     private final java.util.Set<String> expiryInFlight = new HashSet<>();
+    /** group+member -> the generation the member last heartbeated successfully (= has processed that generation's revocations) */
+    private final Map<String, Integer> ackedGeneration = new HashMap<>();
     private long epochTerm = -1;
     private long leaderSinceMs;
     private final Map<String, Long> rebalancesByGroup = new HashMap<>();
@@ -103,6 +115,7 @@ public final class GroupCoordinator {
         if (term != epochTerm) {
             epochTerm = term;
             lastHeartbeat.clear();
+            ackedGeneration.clear();
             expiryInFlight.clear();
             leaderSinceMs = clock.getAsLong();
         }
@@ -118,6 +131,22 @@ public final class GroupCoordinator {
 
     private synchronized void forget(String groupId, String memberId) {
         lastHeartbeat.remove(key(groupId, memberId));
+        ackedGeneration.remove(key(groupId, memberId));
+    }
+
+    private synchronized void acknowledge(String groupId, String memberId, int generation) {
+        ackedGeneration.put(key(groupId, memberId), generation);
+    }
+
+    /** True when every member has heartbeated the group's CURRENT generation in this leader's tenure. */
+    private synchronized boolean everyoneAcknowledged(String groupId, GroupStateMachine.GroupData group) {
+        for (String member : group.members().keySet()) {
+            Integer acked = ackedGeneration.get(key(groupId, member));
+            if (acked == null || acked != group.generation()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private synchronized long lastSeen(String groupId, String memberId) {
@@ -200,6 +229,7 @@ public final class GroupCoordinator {
             return ErrorCode.REBALANCE_IN_PROGRESS;                         // the chart changed: rejoin
         }
         touch(groupId, memberId);
+        acknowledge(groupId, memberId, generation);
         return ErrorCode.NONE;
     }
 
@@ -238,11 +268,19 @@ public final class GroupCoordinator {
             return leader;
         }
         // cheap pre-check on the applied state for a fast failure; the REAL check is the one inside apply()
-        GroupStateMachine.Result pre = GroupStateMachine.checkCommit(state.group(groupId), memberId, generation, offsets);
+        GroupStateMachine.GroupData group = state.group(groupId);
+        GroupStateMachine.Result pre = GroupStateMachine.checkCommit(group, memberId, generation, offsets);
+        boolean lastWords = false;
+        if (pre == GroupStateMachine.Result.PARTITION_NOT_ASSIGNED && config.cooperative()
+                && GroupStateMachine.checkCommit(group, memberId, generation, offsets, true) == GroupStateMachine.Result.OK) {
+            lastWords = true;                              // only partitions nobody owns are missing: the old owner of a handoff
+            pre = GroupStateMachine.Result.OK;
+        }
         if (pre != GroupStateMachine.Result.OK) {
             return errorOf(pre);
         }
-        Object result = proposeAndWait(GroupCommands.encode(new GroupCommands.OffsetCommit(groupId, memberId, generation, offsets)));
+        GroupCommands.OffsetCommit command = new GroupCommands.OffsetCommit(groupId, memberId, generation, offsets);
+        Object result = proposeAndWait(lastWords ? GroupCommands.encodeRevoked(command) : GroupCommands.encode(command));
         return result == GroupStateMachine.Result.OK ? ErrorCode.NONE : errorOf(result);
     }
 
@@ -365,10 +403,16 @@ public final class GroupCoordinator {
                 same = false;
             }
         }
-        if (same || !startExpiry(groupId)) {
+        if (same) {
             return;
         }
-        LOG.log(System.Logger.Level.INFO, "{0}: group {1}: the topic list changed, installing a new assignment", nodeLabel, groupId);
+        if (config.cooperative() && !everyoneAcknowledged(groupId, group)) {
+            return;                                    // a partition may still be in use by its old owner: wait for its acknowledgement
+        }
+        if (!startExpiry(groupId)) {
+            return;
+        }
+        LOG.log(System.Logger.Level.INFO, "{0}: group {1}: completing the assignment (new topic or finished handoff)", nodeLabel, groupId);
         CompletableFuture<Object> future;
         try {
             future = log.propose(GroupCommands.encode(desired), config.proposeTimeoutMs());
@@ -411,13 +455,49 @@ public final class GroupCoordinator {
                 }
             }
         }
-        Map<String, List<PartitionRef>> assignment = Assignor.assign(subscriptions, counts);
+        Map<String, List<PartitionRef>> assignment = config.cooperative()
+                ? cooperativeAssignment(state.group(groupId), members, subscriptions, counts)
+                : Assignor.assign(subscriptions, counts);
         List<GroupCommands.Member> installed = new ArrayList<>();
         for (GroupCommands.Member m : members.values()) {
             installed.add(new GroupCommands.Member(m.memberId(), m.clientId(), m.sessionTimeoutMs(), m.topics(),
                     assignment.getOrDefault(m.memberId(), List.of())));
         }
         return new GroupCommands.SetMembership(groupId, baseGeneration, baseGeneration + 1, installed);
+    }
+
+    /**
+     * Sticky target minus the handoffs: a partition whose CURRENT owner is still a member but is no longer the target owner is
+     * revoked (given to nobody now); it is given to the target owner by a later generation, once the old owner acknowledged. A
+     * partition without a live owner (new, or its owner left or expired) goes straight to its target owner.
+     */
+    private static Map<String, List<PartitionRef>> cooperativeAssignment(GroupStateMachine.GroupData current, Map<String, GroupCommands.Member> members,
+                                                                        Map<String, List<String>> subscriptions, Map<String, Integer> counts) {
+        Map<String, List<PartitionRef>> previous = new TreeMap<>();
+        Map<PartitionRef, String> holder = new HashMap<>();
+        if (current != null) {
+            for (GroupCommands.Member m : current.members().values()) {
+                if (members.containsKey(m.memberId())) {
+                    previous.put(m.memberId(), m.assigned());
+                    for (PartitionRef p : m.assigned()) {
+                        holder.put(p, m.memberId());
+                    }
+                }
+            }
+        }
+        Map<String, List<PartitionRef>> target = Assignor.assignSticky(subscriptions, counts, previous);
+        Map<String, List<PartitionRef>> installed = new TreeMap<>();
+        for (Map.Entry<String, List<PartitionRef>> e : target.entrySet()) {
+            List<PartitionRef> keep = new ArrayList<>();
+            for (PartitionRef p : e.getValue()) {
+                String owner = holder.get(p);
+                if (owner == null || owner.equals(e.getKey())) {
+                    keep.add(p);
+                }
+            }
+            installed.put(e.getKey(), keep);
+        }
+        return installed;
     }
 
     private static List<PartitionRef> assignmentOf(GroupCommands.SetMembership command, String memberId) {

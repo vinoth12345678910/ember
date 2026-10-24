@@ -185,4 +185,18 @@ class GroupStateMachineTest {
             assertEquals(a.snapshot(), b.snapshot(), "seed " + seed);
         }
     }
+
+    @Test
+    void aRevokedCommitMayStoreUnownedPartitionsButNeverOnesAnotherMemberOwns() {
+        membership("g", 0, member("m1", "t-0"), member("m2", "t-1"));
+        // t-2 is owned by nobody (mid-handoff)
+        Object ok = sm.apply(++index, LogEntry.command(1, GroupCommands.encodeRevoked(new GroupCommands.OffsetCommit("g", "m1", 1, List.of(off("t", 2, 40))))));
+        assertEquals(OK, ok);
+        assertEquals(40, sm.committedOffset("g", new PartitionRef("t", 2)));
+        Object refused = sm.apply(++index, LogEntry.command(1, GroupCommands.encodeRevoked(new GroupCommands.OffsetCommit("g", "m1", 1, List.of(off("t", 1, 7))))));
+        assertEquals(PARTITION_NOT_ASSIGNED, refused, "t-1 belongs to m2");
+        assertEquals(PARTITION_NOT_ASSIGNED, commit("g", "m1", 1, off("t", 3, 1)), "the ordinary commit stays strict");
+        Object stale = sm.apply(++index, LogEntry.command(1, GroupCommands.encodeRevoked(new GroupCommands.OffsetCommit("g", "m1", 0, List.of(off("t", 2, 99))))));
+        assertEquals(ILLEGAL_GENERATION, stale, "generation fencing still applies");
+    }
 }

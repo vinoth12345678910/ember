@@ -58,7 +58,8 @@ public final class GroupStateMachine implements StateMachine {
         try {
             return switch (GroupCommands.type(command)) {
                 case GroupCommands.SET_MEMBERSHIP -> setMembership(GroupCommands.decodeSetMembership(command));
-                case GroupCommands.OFFSET_COMMIT -> commit(GroupCommands.decodeOffsetCommit(command));
+                case GroupCommands.OFFSET_COMMIT -> commit(GroupCommands.decodeOffsetCommit(command), false);
+                case GroupCommands.OFFSET_COMMIT_REVOKED -> commit(GroupCommands.decodeOffsetCommit(command), true);
                 default -> throw new IllegalStateException("unknown __groups command type " + GroupCommands.type(command));
             };
         } catch (IllegalArgumentException malformed) {
@@ -91,8 +92,8 @@ public final class GroupStateMachine implements StateMachine {
         return Result.OK;
     }
 
-    private Result commit(GroupCommands.OffsetCommit c) {
-        Result check = checkCommit(groups.get(c.groupId()), c.memberId(), c.generation(), c.offsets());
+    private Result commit(GroupCommands.OffsetCommit c, boolean allowUnowned) {
+        Result check = checkCommit(groups.get(c.groupId()), c.memberId(), c.generation(), c.offsets(), allowUnowned);
         if (check != Result.OK) {
             return check;
         }
@@ -110,6 +111,11 @@ public final class GroupStateMachine implements StateMachine {
      * answer. All or nothing: the first failing check rejects the whole request.
      */
     static Result checkCommit(GroupData group, String memberId, int generation, List<PartitionOffset> offsets) {
+        return checkCommit(group, memberId, generation, offsets, false);
+    }
+
+    /** allowUnowned: a partition that NO member owns may be committed too (see OFFSET_COMMIT_REVOKED). */
+    static Result checkCommit(GroupData group, String memberId, int generation, List<PartitionOffset> offsets, boolean allowUnowned) {
         if (group == null || !group.members().containsKey(memberId)) {
             return Result.UNKNOWN_MEMBER_ID;
         }
@@ -117,9 +123,25 @@ public final class GroupStateMachine implements StateMachine {
             return Result.ILLEGAL_GENERATION;
         }
         Set<PartitionRef> assigned = new HashSet<>(group.members().get(memberId).assigned());
+        Set<PartitionRef> ownedByAnyone = null;
         for (PartitionOffset o : offsets) {
-            if (!assigned.contains(new PartitionRef(o.topic(), o.partition()))) {
-                return Result.PARTITION_NOT_ASSIGNED;
+            PartitionRef ref = new PartitionRef(o.topic(), o.partition());
+            if (!assigned.contains(ref)) {
+                if (!allowUnowned) {
+                    return Result.PARTITION_NOT_ASSIGNED;
+                }
+                // A cooperative handoff leaves a partition UNOWNED between the old and the new owner. The old owner commits its
+                // last position then ("last words"); nobody else can own the partition until it has acknowledged the generation,
+                // so this cannot race with a new owner. A partition owned by ANOTHER member is still refused.
+                if (ownedByAnyone == null) {
+                    ownedByAnyone = new HashSet<>();
+                    for (GroupCommands.Member m : group.members().values()) {
+                        ownedByAnyone.addAll(m.assigned());
+                    }
+                }
+                if (ownedByAnyone.contains(ref)) {
+                    return Result.PARTITION_NOT_ASSIGNED;
+                }
             }
             if (o.offset() < 0) {
                 return Result.INVALID;

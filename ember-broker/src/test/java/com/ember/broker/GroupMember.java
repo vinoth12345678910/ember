@@ -27,9 +27,13 @@ final class GroupMember implements AutoCloseable {
     private volatile boolean stop;
 
     GroupMember(TestCluster c, String group, String name, int sessionMs, int heartbeatMs, boolean autoCommit, int commitMs, String... topics) {
+        this(c, group, name, sessionMs, heartbeatMs, autoCommit, commitMs, false, topics);
+    }
+
+    GroupMember(TestCluster c, String group, String name, int sessionMs, int heartbeatMs, boolean autoCommit, int commitMs, boolean incremental, String... topics) {
         this.name = name;
         GroupConsumerConfig config = EmberGroupConsumerTest.groupConfig(c, group)
-                .withClientId(name).withSession(sessionMs, heartbeatMs).withAutoCommit(autoCommit, commitMs);
+                .withClientId(name).withSession(sessionMs, heartbeatMs).withAutoCommit(autoCommit, commitMs).withIncrementalRejoin(incremental);
         this.consumer = new EmberGroupConsumer(config);
         consumer.subscribe(topics);
         this.thread = new Thread(() -> {

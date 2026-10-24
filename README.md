@@ -115,7 +115,7 @@ Measured on one cloud VM (3 brokers, fsync on): 12,371 messages/s claim+ack with
 
 ## Ember Fleet: a live demo
 
-[`demo/fleet`](demo/fleet/README.md) is a ride-dispatch system built on the pieces above: thousands of simulated drivers and riders, a tracker and matcher, billing against a flaky bank, notifications, each service a separate registered app with its own key. `node bin/scenario.js` runs it with a bank outage, always-declined cards and workers that crash after charging, then checks that every ride was matched and completed, every good card was charged exactly once, and nothing is stuck. With 5,000 drivers pinging every 4 s it sustained 1,242 pings/s, matched 608 rides (p50 181 ms) and passed all checks on one cloud VM. The console's **Live Fleet** page (administrators) shows it running: a live map, queue health, a *Break things* panel (bank outage, crashed workers) and a side-by-side comparison of the same poisoned workload through a consumer group and an ack queue: retry-in-place leaves 2,499 of 2,970 healthy messages unprocessed after 30 s, skipping loses all 30 poison messages, the ack queue finishes with nothing lost (11.1 s with 6 workers, 3.1 s with 24). `compare-bench` reproduces it.
+[`demo/fleet`](demo/fleet/README.md) is a ride-dispatch system built on the pieces above: thousands of simulated drivers and riders, a tracker and matcher, billing against a flaky bank, notifications, each service a separate registered app with its own key. `node bin/scenario.js` runs it with a bank outage, always-declined cards and workers that crash after charging, then checks that every ride was matched and completed, every good card was charged exactly once, and nothing is stuck. With 5,000 drivers pinging every 4 s it sustained 1,242 pings/s, matched 608 rides (p50 181 ms) and passed all checks on one cloud VM. The console's **Live Fleet** page (administrators) shows it running: a live map, queue health, a *Break things* panel (bank outage, crashed workers) and a side-by-side comparison of the same poisoned workload through a consumer group and an ack queue: retry-in-place leaves 2,499 of 2,970 healthy messages unprocessed after 30 s, skipping loses all 30 poison messages, the ack queue finishes with nothing lost (11.1 s with 6 workers, 3.1 s with 24). `compare-bench` reproduces it. A guided tour: [`docs/FLEET-DEMO.md`](docs/FLEET-DEMO.md); what it does not prove: [`docs/LIMITS.md`](docs/LIMITS.md).
 
 ## Contents
 [Architecture](#architecture) · [Design concepts](#design-concepts) · [Features](#features) · [Quickstart](#quickstart-docker) · [Guarantees](#guarantees-and-non-guarantees) · [Performance](#measured-performance) · [Testing](#how-i-tested-it) · [Failure matrix](#failure-matrix-summary) · [Structure](#project-structure) · [Build and run](#build-and-run) · [Limitations](#known-limitations)
@@ -243,7 +243,7 @@ stateDiagram-v2
     Fenced --> Joining: rejoin
 ```
 
-The coordinator is the leader of the `__groups` Raft group. Every membership change creates a new **generation**, and offset commits carry their generation. A paused "zombie" consumer waking up with an old generation is rejected, so it cannot overwrite its successor's offsets. Offsets are committed through Raft, so they survive the loss of a minority of brokers and a full restart. Rebalancing is eager; delivery is at-least-once (process, then commit).
+The coordinator is the leader of the `__groups` Raft group. Every membership change creates a new **generation**, and offset commits carry their generation. A paused "zombie" consumer waking up with an old generation is rejected, so it cannot overwrite its successor's offsets. Offsets are committed through Raft, so they survive the loss of a minority of brokers and a full restart. Rebalancing is eager by default (every member forgets its positions and restarts from the committed offsets); `--group-rebalance=cooperative` switches to a sticky assignor and a two-phase handoff in which the partitions a member keeps are never interrupted ([`docs/phase6/cooperative-rebalance.md`](docs/phase6/cooperative-rebalance.md)). Delivery is at-least-once (process, then commit).
 
 ### 4. How the system is verified: history checker
 
@@ -288,7 +288,7 @@ Full reasoning for every step is in `docs/phase1..7/` (each step note covers wha
 * **Network and protocol** (Phase 2-3): binary request/response protocol, Netty broker with zero-copy fetch, murmur2 key routing, blocking client library and CLI.
 * **Raft, proven by simulation** (Phase 4): deterministic Raft core with a simulator that attacks it with thousands of failure schedules and checks Raft's safety properties after every event; five injected classic bugs are all caught.
 * **Replicated partitions** (Phase 5): per-partition Raft groups, leader failover without losing an acknowledged record, automatic catch-up, CheckQuorum, idempotent apply.
-* **Consumer groups** (Phase 6): generations and fencing, eager rebalancing, session timeouts, offsets committed through Raft.
+* **Consumer groups** (Phase 6): generations and fencing, eager or cooperative rebalancing (`--group-rebalance`, sticky assignor, two-phase handoff; one join caused 240 repeated records eagerly and 0 cooperatively in the integration test), session timeouts, offsets committed through Raft.
 * **Observability** (Phase 7): own metrics library with Prometheus output, admin HTTP server (`/metrics`, `/health/live`, `/health/ready`, `/status`), Grafana dashboard.
 * **Chaos verification** (Phase 7): history recorder, nine-property checker, nemesis, 5-minute external run against Docker (102,840 acknowledged writes, 18 faults, 0 violations) and 15-minute soak runs.
 * **Benchmark tooling** (Phase 7): percentiles, warm-up, CSV, fixed-rate mode.
@@ -389,7 +389,7 @@ The full table with what the client sees: [`docs/phase5/design.md`](docs/phase5/
 | `ember-client` | `ClusterClient`, `EmberProducer`, `EmberConsumer`, `EmberGroupConsumer`, the CLI, bench |
 | `ember-chaos` | history recorder, checker, nemesis, in-process and external runners, failover/catch-up benchmarks |
 
-Documentation: [`docs/PROTOCOL.md`](docs/PROTOCOL.md) (byte layouts and semantics), [`docs/OPERATIONS.md`](docs/OPERATIONS.md) (runbook), `docs/phase1..7/` (one note per step explaining *why*, plus a design document per phase), `docs/ember-part*-notebooklm.md` (study guides), `docs/DEMO-SCRIPT.md`, `docs/INTERVIEW-QA.md`, `docs/RESUME-BULLETS.md`.
+Documentation: [`docs/PROTOCOL.md`](docs/PROTOCOL.md) (byte layouts and semantics), [`docs/OPERATIONS.md`](docs/OPERATIONS.md) (runbook), `docs/phase1..7/` (one note per step explaining *why*, plus a design document per phase), `docs/ember-part*-notebooklm.md` (study guides), `docs/FLEET-DEMO.md`, `docs/LIMITS.md`, `docs/DEMO-SCRIPT.md`, `docs/INTERVIEW-QA.md`, `docs/RESUME-BULLETS.md`.
 
 ## Build and run
 
@@ -406,7 +406,7 @@ java -jar ember-broker/target/ember-broker-0.1.0-SNAPSHOT-all.jar --node-id=1 --
      --cluster=1@localhost:9001,2@localhost:9002,3@localhost:9003      # run the same command with --node-id=2 and 3 (their own data dirs)
 java -jar ember-broker/target/ember-broker-0.1.0-SNAPSHOT-all.jar --port=9099 --data-dir=./ember-data           # a single broker (a cluster of one)
 ```
-Main flags (`--name=value`): `node-id`, `cluster` (`id@host:port[/advertisedHost:port],...`), `advertise`, `port`, `data-dir`, `admin-port` (default port+1000, `0` = off), `admin-host` (127.0.0.1), `enable-debug-endpoints` (off), `raft-election-min-ms/-max-ms/-heartbeat-ms` (300/600/100), `produce-timeout-ms` (5000), `unsafe-no-raft-fsync` (**unsafe**), `data-flush`, `segment-bytes`, `retention-ms/-bytes`, `default-partitions`, `max-partitions`, `max-frame-bytes`, `handler-threads`, `group-min/max-session-ms`. More in `docs/OPERATIONS.md`. SIGTERM/Ctrl+C shuts down cleanly. The admin port is **unauthenticated**: keep it on a trusted network.
+Main flags (`--name=value`): `node-id`, `cluster` (`id@host:port[/advertisedHost:port],...`), `advertise`, `port`, `data-dir`, `admin-port` (default port+1000, `0` = off), `admin-host` (127.0.0.1), `enable-debug-endpoints` (off), `raft-election-min-ms/-max-ms/-heartbeat-ms` (300/600/100), `produce-timeout-ms` (5000), `unsafe-no-raft-fsync` (**unsafe**), `data-flush`, `segment-bytes`, `retention-ms/-bytes`, `default-partitions`, `max-partitions`, `max-frame-bytes`, `handler-threads`, `group-min/max-session-ms`, `group-rebalance` (`eager`|`cooperative`). More in `docs/OPERATIONS.md`. SIGTERM/Ctrl+C shuts down cleanly. The admin port is **unauthenticated**: keep it on a trusted network.
 
 ### CLI reference
 ```
@@ -435,11 +435,11 @@ try (EmberGroupConsumer consumer = new EmberGroupConsumer(config)) {
 
 ## Known limitations
 
-Replication factor = cluster size, with no adding or removing brokers; no Raft snapshots (the Raft log never shrinks and restart replays it); every record is written twice (Raft log + data log); one coordinator for all consumer groups and no compaction of the `__groups` or `__acks` logs; eager rebalancing with a non-sticky range assignor; the default producer sends one request per partition in sequence (more partitions can mean *lower* single-producer throughput; `EmberProducer.pipelined` sends them in parallel); one advertised address per broker (no multiple listeners); no TLS or authentication; no exactly-once or idempotent producer; no long-poll fetch; the partition count of a topic is fixed and topics cannot be deleted.
+Replication factor = cluster size, with no adding or removing brokers; no Raft snapshots (the Raft log never shrinks and restart replays it); every record is written twice (Raft log + data log); one coordinator for all consumer groups and no compaction of the `__groups` or `__acks` logs; eager rebalancing with a non-sticky range assignor by default (cooperative mode is opt-in); the default producer sends one request per partition in sequence (more partitions can mean *lower* single-producer throughput; `EmberProducer.pipelined` sends them in parallel); one advertised address per broker (no multiple listeners); no TLS or authentication; no exactly-once or idempotent producer; no long-poll fetch; the partition count of a topic is fixed and topics cannot be deleted.
 
 ## What I would build next
 
-Raft snapshots and log compaction; an idempotent producer (removes the duplicate caveat); pipelining across batches (today's pipelining is across the partitions of one batch); sharded group coordinators; cooperative rebalancing and a sticky assignor; adding and removing brokers; tiered storage; TLS and authentication.
+Raft snapshots and log compaction; an idempotent producer (removes the duplicate caveat); pipelining across batches (today's pipelining is across the partitions of one batch); sharded group coordinators; cooperative rebalancing as the default, static membership; adding and removing brokers; tiered storage; TLS and authentication.
 
 ## What I learned
 

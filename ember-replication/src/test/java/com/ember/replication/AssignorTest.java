@@ -120,4 +120,97 @@ class AssignorTest {
             }
         }
     }
+
+    // ------------------------------------------------------------------ sticky
+
+    private static Map<String, List<PartitionRef>> prev(Map<String, List<PartitionRef>> a) {
+        return a;
+    }
+
+    private static int moved(Map<String, List<PartitionRef>> before, Map<String, List<PartitionRef>> after) {
+        int n = 0;
+        for (var e : after.entrySet()) {
+            Set<PartitionRef> had = new HashSet<>(before.getOrDefault(e.getKey(), List.of()));
+            for (PartitionRef p : e.getValue()) if (!had.contains(p)) n++;
+        }
+        return n;
+    }
+
+    @Test
+    void withNoHistoryStickyIsAsBalancedAsRange() {
+        Map<String, List<PartitionRef>> a = Assignor.assignSticky(subs("a", List.of("t"), "b", List.of("t"), "c", List.of("t")), Map.of("t", 7), Map.of());
+        assertEquals(List.of(3, 2, 2), List.of(a.get("a").size(), a.get("b").size(), a.get("c").size()));
+    }
+
+    @Test
+    void aNewMemberTakesOnlyItsFairShareFromTheOthers() {
+        Map<String, List<String>> two = subs("a", List.of("t"), "b", List.of("t"));
+        Map<String, List<PartitionRef>> before = Assignor.assignSticky(two, Map.of("t", 12), Map.of());
+        Map<String, List<String>> three = subs("a", List.of("t"), "b", List.of("t"), "c", List.of("t"));
+        Map<String, List<PartitionRef>> after = Assignor.assignSticky(three, Map.of("t", 12), prev(before));
+        assertEquals(4, after.get("a").size());
+        assertEquals(4, after.get("b").size());
+        assertEquals(4, after.get("c").size());
+        assertEquals(4, moved(before, after), "only the newcomer's four partitions changed owner");
+        Map<String, List<PartitionRef>> range = Assignor.assign(three, Map.of("t", 12));
+        assertTrue(moved(before, range) > 4, "the range assignor moves more than the minimum: " + moved(before, range));
+    }
+
+    @Test
+    void aLeavingMemberHandsItsPartitionsToTheRestWithoutShufflingThem() {
+        Map<String, List<String>> three = subs("a", List.of("t"), "b", List.of("t"), "c", List.of("t"));
+        Map<String, List<PartitionRef>> before = Assignor.assignSticky(three, Map.of("t", 12), Map.of());
+        Map<String, List<PartitionRef>> after = Assignor.assignSticky(subs("a", List.of("t"), "c", List.of("t")), Map.of("t", 12), prev(before));
+        assertEquals(6, after.get("a").size());
+        assertEquals(6, after.get("c").size());
+        assertTrue(after.get("a").containsAll(before.get("a")));
+        assertTrue(after.get("c").containsAll(before.get("c")));
+        assertEquals(4, moved(before, after), "exactly b's four partitions moved");
+    }
+
+    @Test
+    void stickyIsAFixedPointAndDeterministic() {
+        Map<String, List<String>> s = subs("a", List.of("t", "u"), "b", List.of("t"), "c", List.of("u"));
+        Map<String, Integer> counts = Map.of("t", 5, "u", 4);
+        Map<String, List<PartitionRef>> first = Assignor.assignSticky(s, counts, Map.of());
+        assertEquals(first, Assignor.assignSticky(s, counts, first));
+        assertEquals(first, Assignor.assignSticky(s, counts, Map.of()));
+    }
+
+    @Test
+    void everyPartitionHasExactlyOneOwnerAndBalanceIsWithinOneForRandomChurn() {
+        Random random = new Random(42);
+        Map<String, Integer> counts = Map.of("t", 13, "u", 5);
+        Map<String, List<PartitionRef>> current = Map.of();
+        for (int round = 0; round < 300; round++) {
+            Map<String, List<String>> s = new LinkedHashMap<>();
+            for (int m = 0; m < 1 + random.nextInt(6); m++) {
+                List<String> topics = random.nextBoolean() ? List.of("t") : random.nextBoolean() ? List.of("u") : List.of("t", "u");
+                s.put("m" + m, topics);
+            }
+            Map<String, List<PartitionRef>> next = Assignor.assignSticky(s, counts, current);
+            for (var topic : counts.entrySet()) {
+                List<String> readers = s.entrySet().stream().filter(e -> e.getValue().contains(topic.getKey())).map(Map.Entry::getKey).toList();
+                if (readers.isEmpty()) continue;
+                Set<PartitionRef> seen = new HashSet<>();
+                int min = Integer.MAX_VALUE, max = 0;
+                for (String r : readers) {
+                    List<PartitionRef> mine = next.get(r).stream().filter(p -> p.topic().equals(topic.getKey())).toList();
+                    for (PartitionRef p : mine) assertTrue(seen.add(p), "owned twice: " + p);
+                    min = Math.min(min, mine.size());
+                    max = Math.max(max, mine.size());
+                }
+                assertEquals(topic.getValue(), seen.size(), "every partition assigned");
+                assertTrue(max - min <= 1, "balanced within one in round " + round);
+            }
+            current = next;
+        }
+    }
+
+    @Test
+    void historyOfUnknownMembersOrUnsubscribedTopicsIsIgnored() {
+        Map<String, List<PartitionRef>> previous = Map.of("ghost", List.of(new PartitionRef("t", 0)), "a", List.of(new PartitionRef("u", 0), new PartitionRef("t", 99)));
+        Map<String, List<PartitionRef>> a = Assignor.assignSticky(subs("a", List.of("t")), Map.of("t", 3), previous);
+        assertEquals(List.of(new PartitionRef("t", 0), new PartitionRef("t", 1), new PartitionRef("t", 2)), a.get("a"));
+    }
 }

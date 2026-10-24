@@ -49,7 +49,8 @@ public record BrokerConfig(
         String adminHost,
         boolean enableDebugEndpoints,
         String advertiseHost,           // --advertise (null = none given)
-        int advertisePort) {
+        int advertisePort,
+        boolean groupCooperative) {          // --group-rebalance=cooperative: sticky assignment + two-phase handoff (default: eager)
 
     /** host:port is where the BROKERS reach each other; advertisedHost:advertisedPort is what CLIENTS are told (default: the same). */
     public record ClusterMember(int nodeId, String host, int port, String advertisedHost, int advertisedPort) {
@@ -112,6 +113,7 @@ public record BrokerConfig(
         boolean dataFlushGiven = false;
         int groupMinSessionMs = 1000;
         int groupMaxSessionMs = 60_000;
+        boolean groupCooperative = false;
         int adminPort = -1;
         String adminHost = "127.0.0.1";
         boolean enableDebugEndpoints = false;
@@ -170,6 +172,11 @@ public record BrokerConfig(
                     case "max-pending-produces" -> maxPendingProduces = Integer.parseInt(value);
                     case "peer-queue-size" -> peerQueueSize = Integer.parseInt(value);
                     case "group-min-session-ms" -> groupMinSessionMs = Integer.parseInt(value);
+                    case "group-rebalance" -> groupCooperative = switch (value) {
+                        case "cooperative" -> true;
+                        case "eager" -> false;
+                        default -> throw new IllegalArgumentException("--group-rebalance must be eager or cooperative, not " + value);
+                    };
                     case "group-max-session-ms" -> groupMaxSessionMs = Integer.parseInt(value);
                     case "admin-port" -> adminPort = value.equals("ephemeral") ? -2 : Integer.parseInt(value);
                     case "admin-host" -> adminHost = value;
@@ -224,7 +231,7 @@ public record BrokerConfig(
                 retentionMs, retentionBytes, maxFrameBytes, maxFetchBytes, idleTimeoutMs, autoCreateTopics, handlerThreads,
                 maintenanceIntervalMs, defaultPartitions, maxPartitionsPerTopic, List.copyOf(cluster),
                 raftElectionMinMs, raftElectionMaxMs, raftHeartbeatMs, produceTimeoutMs, maxPendingProduces, peerQueueSize,
-                unsafeNoRaftFsync, dataFlush, dataFlushGiven || legacyFlushGiven, groupMinSessionMs, groupMaxSessionMs, adminPort, adminHost, enableDebugEndpoints, advertiseHost, advertisePort);
+                unsafeNoRaftFsync, dataFlush, dataFlushGiven || legacyFlushGiven, groupMinSessionMs, groupMaxSessionMs, adminPort, adminHost, enableDebugEndpoints, advertiseHost, advertisePort, groupCooperative);
     }
 
     /** "1@host:9001,2@host:9002" */
