@@ -47,6 +47,10 @@ final class BenchRunner {
         int warmup = flags.getInt("warmup-records", 0);
         double rate = Double.parseDouble(flags.get("rate", "0"));
         String csv = flags.get("csv", null);
+        int pipeline = flags.getInt("pipeline", 0);          // 0 = the classic one-partition-at-a-time producer; N = N parallel connections per producer
+        if (pipeline < 0) {
+            throw new IllegalArgumentException("pipeline must be >= 0");
+        }
         if (partitions < 1 || producers < 1 || records < 1 || valueBytes < 0 || batchSize < 1 || warmup < 0 || rate < 0) {
             throw new IllegalArgumentException("partitions, producers, records and batch must be >= 1; value-bytes, warmup-records and rate >= 0");
         }
@@ -68,7 +72,7 @@ final class BenchRunner {
         out.println("bench: topic=" + topic + " partitions=" + baseline.length + " producers=" + producers
                 + " records=" + records + " valueBytes=" + valueBytes + " batch=" + batchSize
                 + (rate > 0 ? " mode=fixed-rate(" + String.format(Locale.ROOT, "%.0f", rate) + " records/s)" : " mode=closed-loop")
-                + (warmup > 0 ? " warmup=" + warmup : ""));
+                + (warmup > 0 ? " warmup=" + warmup : "") + (pipeline > 0 ? " pipeline=" + pipeline : ""));
 
         // 2. P producer threads, each with its own connection, records split evenly
         ExecutorService pool = Executors.newFixedThreadPool(producers);
@@ -93,7 +97,7 @@ final class BenchRunner {
             futures.add(pool.submit(() -> {
                 Random random = new Random(seed);
                 LatencyHistogram histogram = new LatencyHistogram();
-                try (EmberProducer producer = new EmberProducer(config)) {
+                try (EmberProducer producer = pipeline > 0 ? EmberProducer.pipelined(config, pipeline) : new EmberProducer(config)) {
                     start.await();
                     OpenLoopSchedule schedule = rate > 0 ? new OpenLoopSchedule(origin[0], rate / producers / batchSize) : null;
                     long batchNumber = 0;

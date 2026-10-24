@@ -50,8 +50,13 @@ final class WebServer implements AutoCloseable {
     private final BrokerGateway gateway;
     private final Clock clock;
     private final HttpServer http;
-    private final ExecutorService pool = Executors.newFixedThreadPool(8);
+    private final ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();     // requests block on broker acks: cheap virtual threads let thousands wait at once, so publishes batch well
     private final Map<String, ArrayDeque<Long>> failures = new HashMap<>();      // "ip|user" -> times of recent failed logins
+
+    static {
+        // The JDK server closes idle keep-alive connections beyond 200 by default; thousands of clients would see resets.
+        System.setProperty("sun.net.httpserver.maxIdleConnections", System.getProperty("sun.net.httpserver.maxIdleConnections", "20000"));
+    }
 
     WebServer(String host, int port, UserStore users, AppStore apps, Tokens tokens, BrokerGateway gateway, Clock clock) throws IOException {
         this.users = users;
@@ -59,7 +64,7 @@ final class WebServer implements AutoCloseable {
         this.tokens = tokens;
         this.gateway = gateway;
         this.clock = clock;
-        this.http = HttpServer.create(new InetSocketAddress(host, port), 64);
+        this.http = HttpServer.create(new InetSocketAddress(host, port), 2048);
         http.setExecutor(pool);
         http.createContext("/api/", this::api);
         http.createContext("/", this::statik);
@@ -134,6 +139,9 @@ final class WebServer implements AutoCloseable {
             send(ex, e.status, "application/json; charset=utf-8", Json.write(Json.obj("error", e.getMessage())).getBytes(StandardCharsets.UTF_8));
         } catch (IllegalArgumentException | ClassCastException | NullPointerException e) {
             send(ex, 400, "application/json; charset=utf-8", Json.write(Json.obj("error", "bad request")).getBytes(StandardCharsets.UTF_8));
+        } catch (com.ember.client.ProducerOverloadedException e) {
+            ex.getResponseHeaders().set("Retry-After", "1");
+            send(ex, 503, "application/json; charset=utf-8", Json.write(Json.obj("error", "overloaded: slow down and retry", "retryAfterMs", 1000)).getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             LOG.log(System.Logger.Level.WARNING, "cluster call failed for " + ex.getRequestURI().getPath() + ": " + e);
             send(ex, 502, "application/json; charset=utf-8", Json.write(Json.obj("error", "the Ember cluster is not reachable right now: " + e.getMessage()))
@@ -176,7 +184,7 @@ final class WebServer implements AutoCloseable {
         // admin only
         if (path.startsWith("/api/admin/")) {
             if (me.role() != UserStore.Role.ADMIN) throw new ApiException(403, "admin access required");
-            if (path.equals("/api/admin/cluster") && method.equals("GET")) return Json.obj("nodes", gateway.nodes());
+            if (path.equals("/api/admin/cluster") && method.equals("GET")) return Json.obj("nodes", gateway.nodes(), "producer", gateway.producerStats());
             if (path.equals("/api/admin/topics") && method.equals("POST")) return createTopic(body(ex));
             if (path.equals("/api/admin/users") && method.equals("GET")) return Json.obj("users", users.list().stream().map(UserStore.User::view).toList());
             if (path.equals("/api/admin/apps") && method.equals("GET")) return Json.obj("apps", apps.list());
@@ -218,7 +226,7 @@ final class WebServer implements AutoCloseable {
             if (method.equals("POST")) {
                 if (!app.canProduce(topic)) throw new ApiException(403, "this app may not produce to '" + topic + "'");
                 Object r = produce(topic, body(ex));
-                apps.stats(app.id()).produced.incrementAndGet();
+                apps.stats(app.id()).produced.addAndGet(((Map<?, ?>) r).get("results") instanceof List<?> l ? l.size() : 1);
                 return r;
             }
             if (method.equals("GET")) {
@@ -311,11 +319,26 @@ final class WebServer implements AutoCloseable {
         }
     }
 
+    private static final int MAX_BATCH = 500;
+
+    /** One record {"key","value"} or a batch {"records":[{"key","value"},...]} (up to 500). */
     private Object produce(String topic, Map<String, Object> b) throws IOException {
-        String value = str(b, "value");
+        if (b.get("records") instanceof List<?> items) {
+            if (items.isEmpty() || items.size() > MAX_BATCH) throw new ApiException(400, "records must hold 1-" + MAX_BATCH + " entries");
+            List<String[]> kvs = new java.util.ArrayList<>(items.size());
+            for (Object o : items) {
+                @SuppressWarnings("unchecked") Map<String, Object> r = (Map<String, Object>) o;
+                kvs.add(new String[]{str(r, "key"), checkValue(str(r, "value"))});
+            }
+            return Json.obj("results", gateway.produceBatch(topic, kvs));
+        }
+        return gateway.produce(topic, str(b, "key"), checkValue(str(b, "value")));
+    }
+
+    private static String checkValue(String value) {
         if (value == null || value.isEmpty()) throw new ApiException(400, "a message needs a value");
         if (value.length() > 256 * 1024) throw new ApiException(413, "message too large (256 KB max)");
-        return gateway.produce(topic, str(b, "key"), value);
+        return value;
     }
 
     private Object fetch(String topic, Map<String, String> q) throws IOException {

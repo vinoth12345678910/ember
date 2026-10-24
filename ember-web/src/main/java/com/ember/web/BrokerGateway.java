@@ -2,7 +2,7 @@ package com.ember.web;
 
 import com.ember.client.ClientConfig;
 import com.ember.client.ClusterClient;
-import com.ember.client.EmberProducer;
+import com.ember.client.BatchingProducer;
 import com.ember.client.FetchResult;
 import com.ember.client.PartitionView;
 import com.ember.client.RecordMetadata;
@@ -31,14 +31,18 @@ final class BrokerGateway implements AutoCloseable {
 
     private final List<String> adminAddresses;
     private final ClusterClient client;
-    private final EmberProducer producer;
+    private final BatchingProducer producer;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
 
     BrokerGateway(List<String> bootstrap, List<String> adminAddresses) {
+        this(bootstrap, adminAddresses, BatchingProducer.Settings.defaults());
+    }
+
+    BrokerGateway(List<String> bootstrap, List<String> adminAddresses, BatchingProducer.Settings producerSettings) {
         this.adminAddresses = adminAddresses;
         ClientConfig config = ClientConfig.defaults().withBootstrap(bootstrap).withAutoCreate(false, 3).withTimeouts(2_000, 8_000);
         this.client = new ClusterClient(config);
-        this.producer = new EmberProducer(config);
+        this.producer = new BatchingProducer(config, producerSettings);
     }
 
     // ------------------------------------------------------------------ data path
@@ -81,10 +85,58 @@ final class BrokerGateway implements AutoCloseable {
         return out;
     }
 
+    /** One record. Many callers at once are fine: they are batched together behind the scenes. */
     Map<String, Object> produce(String topic, String key, String value) throws IOException {
-        RecordMetadata md = producer.send(topic, key == null || key.isEmpty() ? null : key.getBytes(StandardCharsets.UTF_8),
-                value.getBytes(StandardCharsets.UTF_8));
+        return result(await(producer.send(topic, bytes(key), value.getBytes(StandardCharsets.UTF_8))));
+    }
+
+    /** Several records in one call. Returns one entry per record in input order; a record that failed carries an "error" instead of an offset. */
+    List<Object> produceBatch(String topic, List<String[]> keyValues) throws IOException {
+        List<java.util.concurrent.CompletableFuture<com.ember.client.RecordMetadata>> futures = new ArrayList<>(keyValues.size());
+        for (String[] kv : keyValues) {
+            futures.add(producer.send(topic, bytes(kv[0]), kv[1].getBytes(StandardCharsets.UTF_8)));
+        }
+        List<Object> out = new ArrayList<>(futures.size());
+        for (var f : futures) {
+            try {
+                out.add(result(await(f)));
+            } catch (com.ember.client.ProducerOverloadedException e) {
+                throw e;                                                 // whole call: the client should back off
+            } catch (IOException | RuntimeException e) {
+                out.add(Json.obj("error", String.valueOf(e.getMessage())));
+            }
+        }
+        return out;
+    }
+
+    Map<String, Object> producerStats() {
+        BatchingProducer.Stats st = producer.stats();
+        return Json.obj("acknowledged", st.acknowledged(), "failed", st.failed(), "rejected", st.rejected(), "batches", st.batches(),
+                "queued", st.queued(), "averageBatch", Math.round(st.averageBatch() * 10) / 10.0);
+    }
+
+    private static byte[] bytes(String key) {
+        return key == null || key.isEmpty() ? null : key.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static Map<String, Object> result(RecordMetadata md) {
         return Json.obj("topic", md.topic(), "partition", md.partition(), "offset", md.offset());
+    }
+
+    private static RecordMetadata await(java.util.concurrent.CompletableFuture<RecordMetadata> f) throws IOException {
+        try {
+            return f.get(20, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted", e);
+        } catch (java.util.concurrent.TimeoutException e) {
+            throw new IOException("the cluster did not acknowledge in time");
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable c = e.getCause();
+            if (c instanceof IOException io) throw io;
+            if (c instanceof RuntimeException re) throw re;
+            throw new IOException(c);
+        }
     }
 
     Map<String, Object> fetch(String topic, int partition, long offset, int limit) throws IOException {

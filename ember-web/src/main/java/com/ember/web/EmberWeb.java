@@ -14,7 +14,8 @@ import java.util.Map;
  *
  * Flags (or environment variables): --port / EMBER_WEB_PORT (8088), --host / EMBER_WEB_HOST (0.0.0.0), --bootstrap / EMBER_WEB_BOOTSTRAP,
  * --admin / EMBER_WEB_ADMIN, --data-dir / EMBER_WEB_DATA_DIR (./ember-web-data), --secret / EMBER_WEB_SECRET (random per start when unset),
- * --admin-user / --admin-password (first start only, when no user exists yet).
+ * --admin-user / --admin-password (first start only, when no user exists yet),
+ * --producer-connections (8: parallel connections to the brokers for publishing), --producer-queue (20000: records waiting before publishers are told to slow down).
  */
 public final class EmberWeb {
 
@@ -61,7 +62,12 @@ public final class EmberWeb {
         }
 
         AppStore apps = new AppStore(dataDir.resolve("apps.json"));
-        BrokerGateway gateway = new BrokerGateway(bootstrap, admin);
+        var defaults = com.ember.client.BatchingProducer.Settings.defaults();
+        var producerSettings = new com.ember.client.BatchingProducer.Settings(
+                Integer.parseInt(opt(flags, "producer-connections", "EMBER_WEB_PRODUCER_CONNECTIONS", String.valueOf(defaults.connections()))),
+                defaults.maxBatchRecords(), defaults.maxBatchBytes(), defaults.lingerMs(),
+                Integer.parseInt(opt(flags, "producer-queue", "EMBER_WEB_PRODUCER_QUEUE", String.valueOf(defaults.maxQueuedRecords()))), defaults.maxBlockMs());
+        BrokerGateway gateway = new BrokerGateway(bootstrap, admin, producerSettings);
         WebServer server = new WebServer(host, port, users, apps, new Tokens(key, 8L * 3600_000), gateway, java.time.Clock.systemUTC());
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             server.close();
