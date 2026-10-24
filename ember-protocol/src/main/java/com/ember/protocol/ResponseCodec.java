@@ -46,7 +46,7 @@ public final class ResponseCodec {
             case MetadataResponse m -> metadataSize(m, apiVersion);
             case CreateTopicResponse c -> stringSize(c.topic()) + 4;
             case ClusterMetadataResponse c -> clusterMetadataSize(c);
-            default -> GroupCodec.responseSize(body);
+            default -> QueueCodec.handles(body) ? QueueCodec.responseSize(body) : GroupCodec.responseSize(body);
         });
         ByteBuffer buf = ByteBuffer.allocate(size);
         buf.putInt(correlationId);
@@ -110,7 +110,10 @@ public final class ResponseCodec {
                         }
                     }
                 }
-                default -> GroupCodec.encodeResponse(buf, body);
+                default -> {
+                    if (QueueCodec.handles(body)) QueueCodec.encodeResponse(buf, body);
+                    else GroupCodec.encodeResponse(buf, body);
+                }
             }
         }
         buf.flip();
@@ -166,6 +169,8 @@ public final class ResponseCodec {
             case CREATE_TOPIC -> new CreateTopicResponse(getString(buf, "topic"), getInt(buf, "partitionCount"));
             case FIND_COORDINATOR, JOIN_GROUP, HEARTBEAT, LEAVE_GROUP, OFFSET_COMMIT, OFFSET_FETCH, DESCRIBE_GROUP ->
                     GroupCodec.decodeResponse(apiKey, buf);
+            case QUEUE_FIND, QUEUE_CREATE, QUEUE_CLAIM, QUEUE_ACK, QUEUE_RELEASE, QUEUE_EXTEND, QUEUE_DESCRIBE ->
+                    QueueCodec.decodeResponse(apiKey, buf);
         };
         requireNoTrailingBytes(buf);
         return new Decoded(correlationId, error, body);

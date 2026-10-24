@@ -13,7 +13,15 @@ public enum ApiKey {
     LEAVE_GROUP(14),
     OFFSET_COMMIT(15),
     OFFSET_FETCH(16),
-    DESCRIBE_GROUP(17);
+    DESCRIBE_GROUP(17),
+    /** Ack queues (per-message acknowledgement), served by the leader of the "__acks" Raft group. */
+    QUEUE_FIND(20),
+    QUEUE_CREATE(21),
+    QUEUE_CLAIM(22),
+    QUEUE_ACK(23),
+    QUEUE_RELEASE(24),
+    QUEUE_EXTEND(25),
+    QUEUE_DESCRIBE(26);
 
     private final short code;
 

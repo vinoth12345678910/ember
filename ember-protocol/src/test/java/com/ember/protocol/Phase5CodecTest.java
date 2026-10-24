@@ -160,7 +160,7 @@ class Phase5CodecTest {
             assertEquals(expected[i], d.errorCode());
             assertNull(d.body());
         }
-        assertThrows(ProtocolException.class, () -> ErrorCode.fromCode((short) 21));   // 14..20 are the Phase 6 group errors
+        assertThrows(ProtocolException.class, () -> ErrorCode.fromCode((short) 25));   // 14..20 are the Phase 6 group errors, 21..24 the ack-queue errors
     }
 
     // ---- METADATA v2
