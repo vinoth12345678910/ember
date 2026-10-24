@@ -24,6 +24,8 @@ jobs:
           node-version: "20"
       - name: Node SDK tests
         run: cd sdk/node && npm test
+      - name: Fleet demo tests
+        run: cd demo/fleet && npm test
       - name: Upload test reports when the build fails
         if: failure()
         uses: actions/upload-artifact@v4
