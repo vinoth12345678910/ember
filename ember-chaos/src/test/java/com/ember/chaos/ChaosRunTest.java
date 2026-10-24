@@ -20,8 +20,13 @@ class ChaosRunTest {
     }
 
     private void run(Path dir, long seed, long millis) throws Exception {
+        run(dir, seed, millis, false);
+    }
+
+    private void run(Path dir, long seed, long millis, boolean cooperative) throws Exception {
         Path history = dir.resolve("history-" + seed + ".jsonl");
-        ChaosRunner.Summary summary = ChaosRunner.runInProcess(config(seed, millis, history), dir.resolve("cluster"), 3, false);
+        ChaosRunner.Config cfg = config(seed, millis, history);
+        ChaosRunner.Summary summary = ChaosRunner.runInProcess(cooperative ? cfg.withCooperative() : cfg, dir.resolve("cluster"), 3, false);
         System.out.print(summary.table());
         System.out.println("schedule: " + summary.schedule());
         if (!summary.ok()) {
@@ -51,6 +56,16 @@ class ChaosRunTest {
     @Test
     void seedThreeTwentySeconds(@TempDir Path dir) throws Exception {
         run(dir, 20_26_03, 20_000);
+    }
+
+    @Test
+    void cooperativeRebalanceSeedOne(@TempDir Path dir) throws Exception {
+        run(dir, 20_26_11, 20_000, true);
+    }
+
+    @Test
+    void cooperativeRebalanceSeedTwo(@TempDir Path dir) throws Exception {
+        run(dir, 20_26_12, 20_000, true);
     }
 
     @Test

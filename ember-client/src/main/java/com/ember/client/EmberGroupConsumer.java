@@ -107,10 +107,13 @@ public final class EmberGroupConsumer implements AutoCloseable {
     }
 
     private void joinAndStart() throws IOException {
-        synchronized (lock) {
-            assignment = new TreeSet<>();                 // stop owning anything until the new assignment is known
-            positions.clear();
-            committed.clear();
+        boolean incremental = config.incrementalRejoin();
+        if (!incremental) {
+            synchronized (lock) {
+                assignment = new TreeSet<>();             // stop owning anything until the new assignment is known
+                positions.clear();
+                committed.clear();
+            }
         }
         for (int attempt = 0; attempt < MAX_JOIN_ATTEMPTS; attempt++) {
             String id;
@@ -123,12 +126,18 @@ public final class EmberGroupConsumer implements AutoCloseable {
             rebalanceNeeded.set(false);
             try {
                 var joined = client.joinGroup(config.groupId(), id, config.clientId(), config.sessionTimeoutMs(), subscribed);
-                synchronized (lock) {
-                    memberId = joined.memberId();
-                    generation = joined.generation();
-                    assignment = new TreeSet<>(joined.assignment());
+                if (incremental && !id.isEmpty() && id.equals(joined.memberId())) {
+                    applyIncrementally(joined.generation(), joined.assignment());
+                } else {
+                    synchronized (lock) {
+                        memberId = joined.memberId();
+                        generation = joined.generation();
+                        assignment = new TreeSet<>(joined.assignment());
+                        positions.clear();
+                        committed.clear();
+                    }
+                    initializePositions(joined.assignment());
                 }
-                initializePositions();
                 joins++;
                 lastAutoCommitMs = System.currentTimeMillis();
                 return;
@@ -137,6 +146,9 @@ public final class EmberGroupConsumer implements AutoCloseable {
                     case UNKNOWN_MEMBER_ID -> {
                         synchronized (lock) {
                             memberId = "";                // we were expired: start again as a new member
+                            assignment = new TreeSet<>();
+                            positions.clear();
+                            committed.clear();
                         }
                     }
                     case REBALANCE_IN_PROGRESS -> {
@@ -156,12 +168,53 @@ public final class EmberGroupConsumer implements AutoCloseable {
         throw new EmberException(ErrorCode.REBALANCE_IN_PROGRESS);
     }
 
-    /** Committed offset if it is still inside the log, else the autoOffsetReset policy. */
-    private void initializePositions() throws IOException {
-        List<PartitionRef> owned;
+    /**
+     * The cooperative way to take a new assignment: partitions we keep are never touched (same position, no re-read of the
+     * committed offset, nothing refetched); partitions taken away get their last position committed (the coordinator allows
+     * that while they are unowned), and only the new ones read their start position from the group. The generation is adopted
+     * LAST: the heartbeat thread then acknowledges it, which tells the coordinator that the revoked partitions are safe to hand over.
+     */
+    private void applyIncrementally(int newGeneration, List<PartitionRef> newAssignment) throws IOException {
+        Set<PartitionRef> fresh = new TreeSet<>(newAssignment);
+        List<PartitionOffset> lastWords = new ArrayList<>();
+        List<PartitionRef> added = new ArrayList<>();
+        String id;
         synchronized (lock) {
-            owned = new ArrayList<>(assignment);
+            id = memberId;
+            for (PartitionRef p : assignment) {
+                Long position = positions.get(p);
+                if (!fresh.contains(p) && position != null && !position.equals(committed.get(p))) {
+                    lastWords.add(new PartitionOffset(p.topic(), p.partition(), position));
+                }
+            }
+            for (PartitionRef p : fresh) {
+                if (!assignment.contains(p)) {
+                    added.add(p);
+                }
+            }
         }
+        if (!lastWords.isEmpty()) {
+            try {
+                client.offsetCommit(config.groupId(), id, newGeneration, lastWords);
+            } catch (EmberException e) {
+                LOG.log(System.Logger.Level.INFO, "last-words commit refused ({0}): the new owner repeats a little work", e.errorCode());
+            }
+        }
+        synchronized (lock) {
+            assignment.removeIf(p -> !fresh.contains(p));
+            positions.keySet().removeIf(p -> !fresh.contains(p));
+            committed.keySet().removeIf(p -> !fresh.contains(p));
+            assignment.addAll(added);
+        }
+        initializePositions(added);
+        synchronized (lock) {
+            generation = newGeneration;                   // adopted last: the next heartbeat acknowledges it
+        }
+    }
+
+    /** Committed offset if it is still inside the log, else the autoOffsetReset policy. */
+    private void initializePositions(Collection<PartitionRef> partitions) throws IOException {
+        List<PartitionRef> owned = new ArrayList<>(partitions);
         if (owned.isEmpty()) {
             return;
         }

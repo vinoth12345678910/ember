@@ -43,13 +43,18 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
 
     /** ratePerSecond: total produce rate of all producers (0 = as fast as they can go). */
     public record Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group, double ratePerSecond,
-                         int queueWorkers, String queue) {
+                         int queueWorkers, String queue, boolean cooperative) {
+        public Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group, double ratePerSecond,
+                      int queueWorkers, String queue) {
+            this(topic, partitions, producers, readers, consumers, bootstrap, group, ratePerSecond, queueWorkers, queue, false);
+        }
+
         public Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group, double ratePerSecond) {
-            this(topic, partitions, producers, readers, consumers, bootstrap, group, ratePerSecond, 0, null);
+            this(topic, partitions, producers, readers, consumers, bootstrap, group, ratePerSecond, 0, null, false);
         }
 
         public Config(String topic, int partitions, int producers, int readers, int consumers, List<String> bootstrap, String group) {
-            this(topic, partitions, producers, readers, consumers, bootstrap, group, 0, 0, null);
+            this(topic, partitions, producers, readers, consumers, bootstrap, group, 0, 0, null, false);
         }
     }
 
@@ -251,7 +256,8 @@ public final class Workload implements Nemesis.ClientFaults, AutoCloseable {
 
     private void consumeLoop(String process) {
         GroupConsumerConfig groupConfig = GroupConsumerConfig.of(config.bootstrap(), config.group()).withClient(clientConfig)
-                .withClientId(process).withSession(GROUP_SESSION_MS, GROUP_HEARTBEAT_MS).withAutoCommit(false, 5_000);
+                .withClientId(process).withSession(GROUP_SESSION_MS, GROUP_HEARTBEAT_MS).withAutoCommit(false, 5_000)
+                .withIncrementalRejoin(config.cooperative());
         EmberGroupConsumer consumer = new EmberGroupConsumer(groupConfig);
         consumers.add(consumer);
         consumer.subscribe(config.topic());

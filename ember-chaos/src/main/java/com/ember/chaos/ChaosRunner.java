@@ -11,20 +11,25 @@ public final class ChaosRunner {
 
     /** ratePerSecond: total produce rate (0 = unthrottled). sampleAdmins/samplesCsv: scrape /metrics every 10 s into a CSV (soak runs). */
     public record Config(long seed, long durationMs, int producers, int readers, int consumers, int partitions, Set<Fault> faults,
-                         long minGapMs, long maxGapMs, Path historyFile, double ratePerSecond, List<String> sampleAdmins, Path samplesCsv, int queueWorkers) {
+                         long minGapMs, long maxGapMs, Path historyFile, double ratePerSecond, List<String> sampleAdmins, Path samplesCsv, int queueWorkers, boolean cooperative) {
         public Config(long seed, long durationMs, int producers, int readers, int consumers, int partitions, Set<Fault> faults,
                       long minGapMs, long maxGapMs, Path historyFile, double ratePerSecond, List<String> sampleAdmins, Path samplesCsv) {
-            this(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, ratePerSecond, sampleAdmins, samplesCsv, 0);
+            this(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, ratePerSecond, sampleAdmins, samplesCsv, 0, false);
         }
 
         public Config(long seed, long durationMs, int producers, int readers, int consumers, int partitions, Set<Fault> faults,
                       long minGapMs, long maxGapMs, Path historyFile) {
-            this(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, 0, List.of(), null, 0);
+            this(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, 0, List.of(), null, 0, false);
         }
 
         /** The same run with ack-queue workers (and a paced producer so the queue can keep up). */
         public Config withQueue(int workers, double ratePerSecond) {
-            return new Config(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, ratePerSecond, sampleAdmins, samplesCsv, workers);
+            return new Config(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, ratePerSecond, sampleAdmins, samplesCsv, workers, cooperative);
+        }
+
+        /** The same run with cooperative group rebalancing (brokers started with --group-rebalance=cooperative, consumers rejoin incrementally). */
+        public Config withCooperative() {
+            return new Config(seed, durationMs, producers, readers, consumers, partitions, faults, minGapMs, maxGapMs, historyFile, ratePerSecond, sampleAdmins, samplesCsv, queueWorkers, true);
         }
     }
 
@@ -100,7 +105,7 @@ public final class ChaosRunner {
         MetricsSampler sampler = cfg.sampleAdmins().isEmpty() ? null : new MetricsSampler(cfg.sampleAdmins(), 10_000, cfg.samplesCsv());
         if (sampler != null) sampler.start();
         try (Workload workload = new Workload(new Workload.Config(TOPIC, cfg.partitions(), cfg.producers(), cfg.readers(), cfg.consumers(), env.bootstrap(), GROUP,
-                cfg.ratePerSecond(), cfg.queueWorkers(), "chaos-queue-" + suffix), rec)) {
+                cfg.ratePerSecond(), cfg.queueWorkers(), "chaos-queue-" + suffix, cfg.cooperative()), rec)) {
             try {
                 workload.createTopic();
                 workload.start();
@@ -158,7 +163,8 @@ public final class ChaosRunner {
     // ------------------------------------------------------------------ in-process
 
     public static Summary runInProcess(Config cfg, Path dataDir, int brokers, boolean fsync) throws Exception {
-        try (InProcessCluster cluster = new InProcessCluster(dataDir, brokers, fsync)) {
+        try (InProcessCluster cluster = cfg.cooperative() ? new InProcessCluster(dataDir, brokers, fsync, "--group-rebalance=cooperative")
+                : new InProcessCluster(dataDir, brokers, fsync)) {
             InProcessDriver driver = new InProcessDriver(cluster);
             InProcessCollector[] collectorHolder = new InProcessCollector[1];
             return run(cfg, new Environment() {

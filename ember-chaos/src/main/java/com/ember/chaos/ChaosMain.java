@@ -19,7 +19,7 @@ public final class ChaosMain {
 
     private static final String USAGE = """
             usage: java -jar ember-chaos-all.jar [--mode=inprocess|external] [flags]
-              common   : --seed=N --duration=SECONDS --producers=2 --readers=1 --consumers=3 --partitions=3 --rate=RECORDS_PER_SECOND (default: as fast as possible) --queue-workers=N (ack-queue workers, 0 = none; use a --rate so the queue keeps up)
+              common   : --seed=N --duration=SECONDS --producers=2 --readers=1 --consumers=3 --partitions=3 --rate=RECORDS_PER_SECOND (default: as fast as possible) --queue-workers=N (ack-queue workers, 0 = none; use a --rate so the queue keeps up) --rebalance=eager|cooperative (cooperative: in-process brokers get --group-rebalance=cooperative, consumers rejoin incrementally; for an external cluster start the brokers with that flag yourself)
                          --sample-admin=h:p,h:p,h:p --samples-csv=FILE (scrape /metrics every 10 s; adds a leak-trend verdict to the result)
                          --nemesis=all|crash,pause,isolate,link,slow_fsync,drop,delay,client_pause
                          --history=FILE (write the recorded history) --check-only=FILE (check a history, run nothing)
@@ -76,7 +76,7 @@ public final class ChaosMain {
                     Fault.parse(flags.getOrDefault("nemesis", "all")), Long.parseLong(flags.getOrDefault("min-gap-ms", "500")), Long.parseLong(flags.getOrDefault("max-gap-ms", "1500")),
                     historyFile, Double.parseDouble(flags.getOrDefault("rate", "0")),
                     flags.containsKey("sample-admin") ? List.of(flags.get("sample-admin").split(",")) : List.of(),
-                    flags.containsKey("samples-csv") ? Path.of(flags.get("samples-csv")) : null, Integer.parseInt(flags.getOrDefault("queue-workers", "0")));
+                    flags.containsKey("samples-csv") ? Path.of(flags.get("samples-csv")) : null, Integer.parseInt(flags.getOrDefault("queue-workers", "0")), "cooperative".equals(flags.get("rebalance")));
             System.out.println("seed " + seed + " (use --seed=" + seed + " to repeat this fault schedule)");
             ChaosRunner.Summary summary;
             if (flags.getOrDefault("mode", "inprocess").equals("external")) {
